@@ -1,0 +1,148 @@
+﻿using System.Numerics;
+
+namespace WoWViewer.NET.Renderer
+{
+    public class Structs
+    {
+        public struct Terrain
+        {
+            public uint vao;
+            public uint vertexBuffer;
+            public uint indiceBuffer;
+            public Vertex startPos;
+            public RenderBatch[] renderBatches;
+            public Doodad[] doodads;
+            public WorldModelBatch[] worldModelBatches;
+            public Vector4 heights;
+            public Vector4 weights;
+        }
+
+        public struct Vertex
+        {
+            public Vector3 Normal;
+            public Vector4 Color;
+            public Vector2 TexCoord;
+            public Vector3 Position;
+        }
+
+        public struct M2Vertex
+        {
+            public Vector3 Normal;
+            public Vector2 TexCoord;
+            public Vector3 Position;
+
+        }
+        public struct Material
+        {
+            public string filename;
+
+            // M2
+            public uint textureID;
+
+            // WMO
+            public uint textureID1;
+            public uint textureID2;
+            public uint textureID3;
+            internal uint texture1;
+            internal uint texture2;
+            internal uint texture3;
+
+            // ADT
+            public float scale;
+            public float heightScale;
+            public float heightOffset;
+            public uint heightTexture;
+
+            public uint blendMode;
+            internal WoWFormatLib.Structs.M2.TextureFlags flags;
+        }
+
+        public struct RenderBatch
+        {
+            public uint firstFace;
+            public uint numFaces;
+            public uint[] materialID;
+            /* WMO ONLY */
+            public uint groupID;
+            public uint blendType;
+            /* ADT ONLY */
+            public int[] alphaMaterialID;
+            public float[] scales;
+            public int[] heightMaterialIDs;
+
+            public Vector4 heightScales;
+            public Vector4 heightOffsets;
+        }
+
+        public struct Doodad
+        {
+            public string filename;
+            public Vector3 position;
+            public Vector3 rotation;
+            public float scale;
+        }
+
+        public struct DoodadBatch
+        {
+            public uint vao;
+            public uint vertexBuffer;
+            public uint indiceBuffer;
+            public uint[] indices;
+            public BoundingBox boundingBox;
+            public Submesh[] submeshes;
+            public Material[] mats;
+        }
+
+        public struct WorldModelBatch
+        {
+            public Vector3 position;
+            public Vector3 rotation;
+            public WorldModel worldModel;
+        }
+
+        public struct WMODoodad
+        {
+            public string filename;
+            public uint filedataid;
+            public short flags;
+            public Vector3 position;
+            public Quaternion rotation;
+            public float scale;
+            public Vector4 color;
+            public uint doodadSet;
+        }
+
+        public struct BoundingBox
+        {
+            public Vector3 min;
+            public Vector3 max;
+        }
+
+        public struct Submesh
+        {
+            public uint firstFace;
+            public uint numFaces;
+            public uint material;
+            public uint blendType;
+            public uint groupID;
+        }
+
+        public struct WorldModel
+        {
+            public WorldModelGroupBatches[] groupBatches;
+            public Material[] mats;
+            public RenderBatch[] wmoRenderBatch;
+            public WMODoodad[] doodads;
+            public string[] doodadSets;
+        }
+
+        public struct WorldModelGroupBatches
+        {
+            public uint vao;
+            public uint vertexBuffer;
+            public uint indiceBuffer;
+            public uint[] indices;
+            public string groupName;
+        }
+    }
+}
