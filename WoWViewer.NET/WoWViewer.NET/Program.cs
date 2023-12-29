@@ -29,6 +29,7 @@ namespace WoWViewer.NET
         private static uint wmoShaderProgram;
         private static uint m2ShaderProgram;
 
+        private static float movementSpeed = 5f;
         private static bool isMouseDragging = false;
 
         private static GL gl;
@@ -128,12 +129,10 @@ namespace WoWViewer.NET
             {
                 var primaryKeyboard = inputContext.Keyboards.FirstOrDefault();
 
-                var baseMoveSpeed = 5.0f;
+                var moveSpeed = movementSpeed * (float)delta;
 
                 if (primaryKeyboard.IsKeyPressed(Key.ShiftLeft))
-                    baseMoveSpeed *= 2.0f;
-
-                var moveSpeed = baseMoveSpeed * (float)delta;
+                    moveSpeed *= 2.0f;
 
                 imGuiController.Update((float)delta);
                 if (primaryKeyboard.IsKeyPressed(Key.W))
@@ -217,6 +216,8 @@ namespace WoWViewer.NET
                     var newFront = activeCamera.Front;
                     ImGui.DragFloat3("Camera front", ref newFront);
                     activeCamera.Front = newFront;
+
+                    ImGui.DragFloat("Camera movement speed", ref movementSpeed);
 
                     var yaw = activeCamera.Yaw;
                     ImGui.DragFloat("Camera yaw", ref yaw);
