@@ -1,6 +1,7 @@
 ﻿using CASCLib;
 using ImGuiNET;
 using Silk.NET.Input;
+using Silk.NET.Maths;
 using Silk.NET.OpenGL;
 using Silk.NET.OpenGL.Extensions.ImGui;
 using Silk.NET.Windowing;
@@ -42,6 +43,9 @@ namespace WoWViewer.NET
         private static IWindow window;
         private static Vector2 LastMousePosition;
 
+        private static bool renderWMO = true;
+        private static bool renderM2 = false;
+
         static void Main(string[] args)
         {
             cascWorker.DoWork += CASCworker_DoWork;
@@ -57,7 +61,8 @@ namespace WoWViewer.NET
             var windowOptions = WindowOptions.Default;
             windowOptions.API = new GraphicsAPI(ContextAPI.OpenGL, ContextProfile.Core, ContextFlags.ForwardCompatible | ContextFlags.Debug, new APIVersion(4, 3));
             windowOptions.ShouldSwapAutomatically = false;
-            windowOptions.Size = new Silk.NET.Maths.Vector2D<int>(1920, 1080);
+            windowOptions.Size = new Vector2D<int>(1920, 1080);
+            windowOptions.Title = "WoWViewer.NET";
             window = Window.Create(windowOptions);
 
             gl = null;
@@ -95,7 +100,9 @@ namespace WoWViewer.NET
                 wmoShaderProgram = compiler.CompileShader("wmo");
                 m2ShaderProgram = compiler.CompileShader("m2");
 
-                activeCamera = new Camera(new Vector3(-8938, 625, 200), Vector3.UnitX, Vector3.UnitZ * -1, window.Size.X / window.Size.Y);
+                // sw new Vector3(-8938, 625, 200)
+
+                activeCamera = new Camera(new Vector3(0, 0, 200), Vector3.UnitX, Vector3.UnitZ * -1, window.Size.X / window.Size.Y);
 
                 gl.ClearColor(1.0f, 0.0f, 0.0f, 1.0f);
 
@@ -197,9 +204,12 @@ namespace WoWViewer.NET
 
                     var usedUUIDs = new List<uint>();
 
-                    for(byte x = 29; x < 32; x++)
+                    byte startX = 32;
+                    byte startY = 32;
+
+                    for (byte x = startX; x < startX + 3; x++)
                     {
-                        for(byte y = 47; y < 50; y++)
+                        for (byte y = startY; y < startY + 3; y++)
                         {
                             var mapTile = new MapTile();
                             mapTile.tileX = x;
@@ -211,13 +221,21 @@ namespace WoWViewer.NET
 
                             foreach (var worldModel in adt.worldModelBatches)
                             {
-                                if(usedUUIDs.Contains(worldModel.uniqueID))
+                                if (usedUUIDs.Contains(worldModel.uniqueID))
                                     continue;
                                 var worldModelContainer = new WMOContainer(gl, worldModel.fileDataID, wmoShaderProgram);
                                 worldModelContainer.Position = worldModel.position;
                                 worldModelContainer.Rotation = worldModel.rotation;
                                 sceneObjects.Add(worldModelContainer);
                                 usedUUIDs.Add(worldModel.uniqueID);
+                            }
+
+                            foreach (var doodad in adt.doodads)
+                            {
+                                var m2Container = new M2Container(gl, doodad.fileDataID, m2ShaderProgram);
+                                m2Container.Position = doodad.position;
+                                m2Container.Rotation = doodad.rotation;
+                                sceneObjects.Add(m2Container);
                             }
                         }
                     }
@@ -240,6 +258,8 @@ namespace WoWViewer.NET
                 {
                     ImGui.Begin("3D debug");
 
+                    ImGui.Checkbox("Render WMO", ref renderWMO);
+                    ImGui.Checkbox("Render M2", ref renderM2);
                     var newPos = activeCamera.Position;
                     ImGui.DragFloat3("Camera position", ref newPos);
                     activeCamera.Position = newPos;
@@ -380,7 +400,7 @@ namespace WoWViewer.NET
 
         private static unsafe void OnMouseMove(IMouse mouse, Vector2 position)
         {
-            
+
             if (!mouse.IsButtonPressed(MouseButton.Left) || ImGui.IsWindowHovered(ImGuiHoveredFlags.AnyWindow) || ImGui.IsAnyItemActive())
             {
                 LastMousePosition = default;
@@ -409,21 +429,38 @@ namespace WoWViewer.NET
             {
                 if (sceneObject is M2Container activeM2)
                 {
+                    if (!renderM2)
+                        continue;
+
                     var m2 = Cache.GetOrLoadM2(gl, activeM2.FileDataId, m2ShaderProgram);
 
                     gl.UseProgram(m2ShaderProgram);
 
-                    int modelview_location = gl.GetUniformLocation(m2ShaderProgram, "modelview_matrix");
-                    var modelviewMatrix = Matrix4x4.CreateRotationZ(MathF.PI / 180f * 180f);
-                    gl.UniformMatrix4(modelview_location, 1, false, (float*)&modelviewMatrix);
-
-                    int rotation_location = gl.GetUniformLocation(m2ShaderProgram, "rotation_matrix");
-                    var rotationMatrix = activeCamera.GetViewMatrix();
-                    gl.UniformMatrix4(rotation_location, 1, false, (float*)&rotationMatrix);
-
                     int projection_location = gl.GetUniformLocation(m2ShaderProgram, "projection_matrix");
                     var projectionMatrix = activeCamera.GetProjectionMatrix();
                     gl.UniformMatrix4(projection_location, 1, false, (float*)&projectionMatrix);
+
+                    int viewMatrixLoc = gl.GetUniformLocation(m2ShaderProgram, "view_matrix");
+                    var viewMatrix = activeCamera.GetViewMatrix();
+                    viewMatrix *= Matrix4x4.CreateRotationZ(MathF.PI / 180f * 180f);
+
+                    gl.UniformMatrix4(viewMatrixLoc, 1, false, (float*)&viewMatrix);
+
+                    // Model matrix contains position, rotation and scale
+                    int modelMatrixLoc = gl.GetUniformLocation(m2ShaderProgram, "model_matrix");
+                    var modelMatrix = Matrix4x4.CreateScale(1f);
+
+                    // Apply ADT rotation
+                    modelMatrix *= Matrix4x4.CreateRotationZ(MathF.PI / 180f * (sceneObject.Rotation.Y - 270f));
+                    //modelMatrix *= Matrix4x4.CreateRotationX(MathF.PI / 180f * (-wmoContainer.Rotation.X));
+                    //modelMatrix *= Matrix4x4.CreateRotationY(MathF.PI / 180f * (wmoContainer.Rotation.Z - 90f));
+
+                    modelMatrix *= Matrix4x4.CreateTranslation(sceneObject.Position.X, sceneObject.Position.Z * -1, sceneObject.Position.Y);
+
+                    // Post-transform rotation
+                    modelMatrix *= Matrix4x4.CreateRotationZ(MathF.PI / 180f * -270f);
+
+                    gl.UniformMatrix4(modelMatrixLoc, 1, false, (float*)&modelMatrix);
 
                     var alphaRefLoc = gl.GetUniformLocation(m2ShaderProgram, "alphaRef");
                     gl.ActiveTexture(TextureUnit.Texture0);
@@ -468,6 +505,9 @@ namespace WoWViewer.NET
                 }
                 else if (sceneObject is WMOContainer wmoContainer)
                 {
+                    if (!renderWMO)
+                        continue;
+
                     var wmo = Cache.GetOrLoadWMO(gl, sceneObject.FileDataId, wmoShaderProgram);
 
                     gl.UseProgram(wmoShaderProgram);
@@ -532,7 +572,7 @@ namespace WoWViewer.NET
 
                         gl.BindTexture(TextureTarget.Texture2D, wmo.wmoRenderBatch[j].materialID[0]);
                         gl.DrawElements(PrimitiveType.Triangles, wmo.wmoRenderBatch[j].numFaces, DrawElementsType.UnsignedInt, (void*)(wmo.wmoRenderBatch[j].firstFace * 4));
-                        
+
                     }
 
                     var err = gl.GetError();

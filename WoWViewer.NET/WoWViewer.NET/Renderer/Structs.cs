@@ -77,7 +77,7 @@ namespace WoWViewer.NET.Renderer
 
         public struct Doodad
         {
-            public string filename;
+            public uint fileDataID;
             public Vector3 position;
             public Vector3 rotation;
             public float scale;

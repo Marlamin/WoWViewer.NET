@@ -249,29 +249,25 @@ namespace WoWViewer.NET.Loaders
             {
                 for (var mi = 0; mi < adt.objects.models.entries.Count(); mi++)
                 {
-                   // Console.WriteLine("NYI skipping m2 load #" + mi);
-                    continue;
-
                     var modelentry = adt.objects.models.entries[mi];
-                    var mmid = adt.objects.m2NameOffsets.offsets[modelentry.mmidEntry];
+                    //var mmid = adt.objects.m2NameOffsets.offsets[modelentry.mmidEntry];
 
-                    var modelFileName = "";
-                    for (var mmi = 0; mmi < adt.objects.m2Names.offsets.Count(); mmi++)
-                    {
-                        if (adt.objects.m2Names.offsets[mmi] == mmid)
-                        {
-                            modelFileName = adt.objects.m2Names.filenames[mmi].ToLower();
-                            break;
-                        }
-                    }
+                    //var modelFileName = "";
+                    //for (var mmi = 0; mmi < adt.objects.m2Names.offsets.Count(); mmi++)
+                    //{
+                    //    if (adt.objects.m2Names.offsets[mmi] == mmid)
+                    //    {
+                    //        modelFileName = adt.objects.m2Names.filenames[mmi].ToLower();
+                    //        break;
+                    //    }
+                    //}
 
                     doodads.Add(new Doodad
                     {
-                        filename = modelFileName,
                         position = new Vector3(-(modelentry.position.X - 17066), modelentry.position.Y, -(modelentry.position.Z - 17066)),
                         rotation = new Vector3(modelentry.rotation.X, modelentry.rotation.Y, modelentry.rotation.Z),
                         scale = modelentry.scale,
-                        m2Model = M2Loader.LoadM2(gl, modelFileName, shaderProgram)
+                        fileDataID = modelentry.mmidEntry
                     });
                 }
 
