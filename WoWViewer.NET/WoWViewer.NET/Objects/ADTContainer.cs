@@ -1,10 +1,12 @@
-﻿namespace WoWViewer.NET.Objects
+﻿using Silk.NET.OpenGL;
+
+namespace WoWViewer.NET.Objects
 {
     public class ADTContainer : Container3D
     {
         public Renderer.Structs.Terrain Terrain { get; }
 
-        public ADTContainer(Renderer.Structs.Terrain terrain, string fileName) : base(fileName)
+        public ADTContainer(GL gl, Renderer.Structs.Terrain terrain, uint fileDataID, uint shaderProgram) : base(gl, fileDataID, shaderProgram)
         {
             Terrain = terrain;
         }

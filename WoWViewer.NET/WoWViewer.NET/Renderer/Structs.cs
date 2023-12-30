@@ -1,4 +1,5 @@
 ﻿using System.Numerics;
+using WoWViewer.NET.Loaders;
 
 namespace WoWViewer.NET.Renderer
 {
@@ -80,6 +81,7 @@ namespace WoWViewer.NET.Renderer
             public Vector3 position;
             public Vector3 rotation;
             public float scale;
+            public DoodadBatch m2Model;
         }
 
         public struct DoodadBatch
@@ -97,7 +99,8 @@ namespace WoWViewer.NET.Renderer
         {
             public Vector3 position;
             public Vector3 rotation;
-            public WorldModel worldModel;
+            public uint fileDataID;
+            public uint uniqueID;
         }
 
         public struct WMODoodad

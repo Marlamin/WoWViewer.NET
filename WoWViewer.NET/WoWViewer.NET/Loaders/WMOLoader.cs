@@ -6,7 +6,7 @@ using static WoWViewer.NET.Renderer.Structs;
 
 namespace WoWViewer.NET.Loaders
 {
-    class WMOLoader
+    public class WMOLoader
     {
         public static unsafe WorldModel LoadWMO(GL gl, string fileName, uint shaderProgram)
         {
@@ -21,6 +21,7 @@ namespace WoWViewer.NET.Loaders
 
         public static unsafe WorldModel LoadWMO(GL gl, uint fileDataID, uint shaderProgram, string fileName = "")
         {
+            Console.WriteLine("Loading WMO " + fileDataID);
             WMO wmo = new WMOReader().LoadWMO(fileDataID, 0, fileName);
 
             if (wmo.group.Count() == 0)
@@ -36,8 +37,24 @@ namespace WoWViewer.NET.Loaders
 
             for (var g = 0; g < wmo.group.Count(); g++)
             {
-                if (wmo.group[g].mogp.vertices == null)
+                string groupName = null;
+                for (var i = 0; i < wmo.groupNames.Count(); i++)
+                    if (wmo.group[g].mogp.nameOffset == wmo.groupNames[i].offset)
+                        groupName = wmo.groupNames[i].name.Replace(" ", "_");
+
+                if (groupName == "antiportal")
+                {
+                    Console.WriteLine("Skipping group " + groupName + " because antiportal");
                     continue;
+                }
+
+                if (wmo.group[g].mogp.vertices == null)
+                {
+                    Console.WriteLine("Skipping group " + groupName + " because it has no vertices");
+                    continue;
+                }
+
+                wmoBatch.groupBatches[g].groupName = groupName;
 
                 wmoBatch.groupBatches[g].vao = gl.GenVertexArray();
                 wmoBatch.groupBatches[g].vertexBuffer = gl.GenBuffer();
@@ -46,17 +63,7 @@ namespace WoWViewer.NET.Loaders
                 gl.BindVertexArray(wmoBatch.groupBatches[g].vao);
                 gl.BindBuffer(BufferTargetARB.ArrayBuffer, wmoBatch.groupBatches[g].vertexBuffer);
 
-                var wmovertices = new Renderer.Structs.M2Vertex[wmo.group[g].mogp.vertices.Count()];
-
-                string groupName = null;
-                for (var i = 0; i < wmo.groupNames.Count(); i++)
-                    if (wmo.group[g].mogp.nameOffset == wmo.groupNames[i].offset)
-                        groupName = wmo.groupNames[i].name.Replace(" ", "_");
-
-                if (groupName == "antiportal")
-                    continue;
-
-                wmoBatch.groupBatches[g].groupName = groupName;
+                var wmovertices = new M2Vertex[wmo.group[g].mogp.vertices.Count()];
 
                 for (var i = 0; i < wmo.group[g].mogp.vertices.Count(); i++)
                 {
@@ -71,6 +78,11 @@ namespace WoWViewer.NET.Loaders
                 //Push to buffer
                 fixed (M2Vertex* buf = wmovertices)
                     gl.BufferData(BufferTargetARB.ArrayBuffer, (nuint)(wmovertices.Length * 8 * sizeof(float)), buf, BufferUsageARB.StaticDraw);
+
+                if (fileDataID == 342280)
+                {
+                    Console.WriteLine("Created vertex buffer " + wmoBatch.groupBatches[g].vertexBuffer + " with " + wmovertices.Length + " vertices");
+                }
 
                 //Set pointers in buffer
                 //var normalAttrib = GL.GetAttribLocation(shaderProgram, "normal");
@@ -96,8 +108,12 @@ namespace WoWViewer.NET.Loaders
 
                 fixed (uint* buf = wmoBatch.groupBatches[g].indices)
                     gl.BufferData(BufferTargetARB.ElementArrayBuffer, (nuint)(wmoBatch.groupBatches[g].indices.Length * sizeof(uint)), buf, BufferUsageARB.StaticDraw);
-            }
 
+                if (fileDataID == 342280)
+                {
+                    Console.WriteLine("Created indice buffer " + wmoBatch.groupBatches[g].indiceBuffer + " with " + wmoBatch.groupBatches[g].indices.Length + " indices");
+                }
+            }
 
             wmoBatch.mats = new Renderer.Structs.Material[wmo.materials.Count()];
             for (var i = 0; i < wmo.materials.Count(); i++)

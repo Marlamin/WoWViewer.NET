@@ -2,6 +2,7 @@
 using System.Numerics;
 using WoWFormatLib.FileReaders;
 using WoWFormatLib.Structs.ADT;
+using WoWViewer.NET.Renderer;
 using static WoWViewer.NET.Renderer.Structs;
 
 namespace WoWViewer.NET.Loaders
@@ -190,12 +191,12 @@ namespace WoWViewer.NET.Loaders
 
                         var texFileDataID = WoWFormatLib.Utils.CASC.getFileDataIdByName(adt.textures.filenames[adt.texChunks[c].layers[li].textureId]);
 
-                        layerMaterials.Add((uint)BLPLoader.LoadTexture(gl, texFileDataID));
+                        layerMaterials.Add(BLPLoader.LoadTexture(gl, texFileDataID));
                         curMat = materials.Where(material => material.filename == adt.textures.filenames[adt.texChunks[c].layers[li].textureId]).Single();
                     }
                     else
                     {
-                        layerMaterials.Add((uint)BLPLoader.LoadTexture(gl, adt.diffuseTextureFileDataIDs[adt.texChunks[c].layers[li].textureId]));
+                        layerMaterials.Add(BLPLoader.LoadTexture(gl, adt.diffuseTextureFileDataIDs[adt.texChunks[c].layers[li].textureId]));
                         curMat = materials.Where(material => material.filename == adt.diffuseTextureFileDataIDs[adt.texChunks[c].layers[li].textureId].ToString()).Single();
                     }
 
@@ -204,7 +205,6 @@ namespace WoWViewer.NET.Loaders
 
                     batch.heightScales[li] = curMat.heightScale;
                     batch.heightOffsets[li] = curMat.heightOffset;
-
                 }
 
                 batch.materialID = layerMaterials.ToArray();
@@ -249,7 +249,8 @@ namespace WoWViewer.NET.Loaders
             {
                 for (var mi = 0; mi < adt.objects.models.entries.Count(); mi++)
                 {
-                    Console.WriteLine("Loading model #" + mi);
+                   // Console.WriteLine("NYI skipping m2 load #" + mi);
+                    continue;
 
                     var modelentry = adt.objects.models.entries[mi];
                     var mmid = adt.objects.m2NameOffsets.offsets[modelentry.mmidEntry];
@@ -269,36 +270,22 @@ namespace WoWViewer.NET.Loaders
                         filename = modelFileName,
                         position = new Vector3(-(modelentry.position.X - 17066), modelentry.position.Y, -(modelentry.position.Z - 17066)),
                         rotation = new Vector3(modelentry.rotation.X, modelentry.rotation.Y, modelentry.rotation.Z),
-                        scale = modelentry.scale
+                        scale = modelentry.scale,
+                        m2Model = M2Loader.LoadM2(gl, modelFileName, shaderProgram)
                     });
-
-                    M2Loader.LoadM2(gl, modelFileName, shaderProgram);
                 }
 
                 for (var wmi = 0; wmi < adt.objects.worldModels.entries.Count(); wmi++)
                 {
-                    var wmoFileName = "";
-
                     var wmodelentry = adt.objects.worldModels.entries[wmi];
-                    var mwid = adt.objects.wmoNameOffsets.offsets[wmodelentry.mwidEntry];
-
-                    for (var wmfi = 0; wmfi < adt.objects.wmoNames.offsets.Count(); wmfi++)
-                    {
-                        if (adt.objects.wmoNames.offsets[wmfi] == mwid)
-                        {
-                            wmoFileName = adt.objects.wmoNames.filenames[wmfi].ToLower();
-                            break;
-                        }
-                    }
-
-                    if (wmoFileName.Length == 0)
-                        throw new Exception("Unable to find filename for WMO!");
+                    var wmoFDID = wmodelentry.mwidEntry;
 
                     worldModelBatches.Add(new WorldModelBatch
                     {
                         position = new Vector3(-(wmodelentry.position.X - 17066.666f), wmodelentry.position.Y, -(wmodelentry.position.Z - 17066.666f)),
                         rotation = new Vector3(wmodelentry.rotation.X, wmodelentry.rotation.Y, wmodelentry.rotation.Z),
-                        worldModel = WMOLoader.LoadWMO(gl, wmoFileName, shaderProgram)
+                        fileDataID = wmoFDID,
+                        uniqueID = wmodelentry.uniqueId
                     });
                 }
             }

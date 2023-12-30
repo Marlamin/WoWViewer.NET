@@ -1,14 +1,16 @@
-﻿namespace WoWViewer.NET.Objects
+﻿using Silk.NET.OpenGL;
+using WoWViewer.NET.Renderer;
+
+namespace WoWViewer.NET.Objects
 {
     public class WMOContainer : Container3D
     {
-        public Renderer.Structs.WorldModel WorldModel { get; }
         public bool[] EnabledGroups { get; }
         public bool[] EnabledDoodadSets { get; }
 
-        public WMOContainer(Renderer.Structs.WorldModel wmo, string fileName) : base(fileName)
+        public WMOContainer(GL gl, uint fileDataID, uint shaderProgram) : base(gl, fileDataID, shaderProgram)
         {
-            WorldModel = wmo;
+            var wmo = Cache.GetOrLoadWMO(gl, fileDataID, shaderProgram);
             EnabledGroups = new bool[wmo.groupBatches.Length];
             EnabledDoodadSets = new bool[wmo.doodadSets.Length];
 

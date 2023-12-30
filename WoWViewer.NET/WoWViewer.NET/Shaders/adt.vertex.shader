@@ -15,7 +15,7 @@ out vec4 VColor;
 
 void main()
 {
-	gl_Position = projection_matrix * modelview_matrix * rotation_matrix* vec4(vec3(position.x - firstPos.x, position.y - firstPos.y, position.z), 1);
+	gl_Position = projection_matrix * modelview_matrix * rotation_matrix * vec4(vec3(position.x - firstPos.x, position.y - firstPos.y, position.z), 1);
 	TexCoord = texCoord;
 	VColor = color;
 }

@@ -9,7 +9,9 @@ using System.Numerics;
 using System.Runtime.InteropServices;
 using WoWViewer.NET.Loaders;
 using WoWViewer.NET.Objects;
+using WoWViewer.NET.Renderer;
 using WoWViewer.NET.Utils;
+using static WoWViewer.NET.Structs;
 
 namespace WoWViewer.NET
 {
@@ -29,8 +31,9 @@ namespace WoWViewer.NET
         private static uint wmoShaderProgram;
         private static uint m2ShaderProgram;
 
-        private static float movementSpeed = 5f;
+        private static float movementSpeed = 50f;
         private static bool isMouseDragging = false;
+        private static bool hasFocus = true;
 
         private static GL gl;
 
@@ -55,7 +58,6 @@ namespace WoWViewer.NET
             var windowOptions = WindowOptions.Default;
             windowOptions.API = new GraphicsAPI(ContextAPI.OpenGL, ContextProfile.Core, ContextFlags.ForwardCompatible | ContextFlags.Debug, new APIVersion(4, 3));
             windowOptions.ShouldSwapAutomatically = false;
-            windowOptions.PreferredDepthBufferBits = 32;
             windowOptions.Size = new Silk.NET.Maths.Vector2D<int>(1920, 1080);
             window = Window.Create(windowOptions);
 
@@ -95,7 +97,7 @@ namespace WoWViewer.NET
                 m2ShaderProgram = compiler.CompileShader("m2");
                 basicShaderProgram = compiler.CompileShader("basic");
 
-                activeCamera = new Camera(Vector3.UnitZ * 6, Vector3.UnitX, Vector3.UnitZ * -1, window.Size.X / window.Size.Y);
+                activeCamera = new Camera(new Vector3(-8938, 625, 200), Vector3.UnitX, Vector3.UnitZ * -1, window.Size.X / window.Size.Y);
 
                 gl.ClearColor(1.0f, 0.0f, 0.0f, 1.0f);
 
@@ -114,8 +116,6 @@ namespace WoWViewer.NET
                             return;
                         Console.Error.WriteLine($"[DebugMessageCallback] source: {source}, type: {type}, id: {id}, severity {severity}, length {length}, userParam {userparam}\n{msg}\n\n");
                     }, (void*)0);
-
-
                 }
 
             };
@@ -123,6 +123,11 @@ namespace WoWViewer.NET
             window.FramebufferResize += s =>
             {
                 gl.Viewport(s);
+            };
+
+            window.FocusChanged += focused =>
+            {
+                hasFocus = focused;
             };
 
             window.Update += delta =>
@@ -170,6 +175,9 @@ namespace WoWViewer.NET
 
             window.Render += delta =>
             {
+                if (!hasFocus)
+                    return;
+
                 var err = gl.GetError();
                 if (err != GLEnum.NoError)
                 {
@@ -183,13 +191,38 @@ namespace WoWViewer.NET
 
                 if (cascLoaded && listfileLoaded && sceneObjects.Count == 0)
                 {
-                    var m2 = M2Loader.LoadM2(gl, 397940, m2ShaderProgram);
-                    var m2Container = new M2Container(m2, "axistestobject.m2");
-                    sceneObjects.Add(m2Container);
+                    //var m2Container = new M2Container(gl, 397940, m2ShaderProgram);
+                    //sceneObjects.Add(m2Container);
 
-                    var wmo = WMOLoader.LoadWMO(gl, 106685, wmoShaderProgram);
-                    var wmoContainer = new WMOContainer(wmo, "test.wmo");
-                    sceneObjects.Add(wmoContainer);
+                    //var wmoContainer = new WMOContainer(gl, 106685, wmoShaderProgram);
+                    //sceneObjects.Add(wmoContainer);
+
+                    var usedUUIDs = new List<uint>();
+
+                    for(byte x = 29; x < 31; x++)
+                    {
+                        for(byte y = 47; y < 49; y++)
+                        {
+                            var mapTile = new MapTile();
+                            mapTile.tileX = x;
+                            mapTile.tileY = y;
+                            mapTile.wdtFileDataID = 775971;
+                            var adt = ADTLoader.LoadADT(gl, mapTile, adtShaderProgram, true);
+                            var adtContainer = new ADTContainer(gl, adt, 775971, adtShaderProgram);
+                            sceneObjects.Add(adtContainer);
+
+                            foreach (var worldModel in adt.worldModelBatches)
+                            {
+                                if(usedUUIDs.Contains(worldModel.uniqueID))
+                                    continue;
+                                var worldModelContainer = new WMOContainer(gl, worldModel.fileDataID, wmoShaderProgram);
+                                worldModelContainer.Position = worldModel.position;
+                                worldModelContainer.Rotation = worldModel.rotation;
+                                sceneObjects.Add(worldModelContainer);
+                                usedUUIDs.Add(worldModel.uniqueID);
+                            }
+                        }
+                    }
 
                     Console.WriteLine("loaded model");
                 }
@@ -239,6 +272,11 @@ namespace WoWViewer.NET
 
                     var projectionMatrix = activeCamera.GetProjectionMatrix();
                     ImGuiExtensions.DrawMatrix4x4("Projection matrix", projectionMatrix);
+
+                    var firstWMO = sceneObjects[1] as WMOContainer;
+                    var firstWMOPos = firstWMO.Position;
+                    ImGui.DragFloat3("WMO pos", ref firstWMOPos);
+                    firstWMO.Position = firstWMOPos;
 
                     ImGui.End();
                 }
@@ -344,7 +382,8 @@ namespace WoWViewer.NET
 
         private static unsafe void OnMouseMove(IMouse mouse, Vector2 position)
         {
-            if (!mouse.IsButtonPressed(MouseButton.Left) || ImGui.IsWindowHovered(ImGuiHoveredFlags.AnyWindow))
+            
+            if (!mouse.IsButtonPressed(MouseButton.Left) || ImGui.IsWindowHovered(ImGuiHoveredFlags.AnyWindow) || ImGui.IsAnyItemActive())
             {
                 LastMousePosition = default;
                 return;
@@ -368,22 +407,16 @@ namespace WoWViewer.NET
 
         private static unsafe void RenderScene()
         {
-            var err = gl.GetError();
-            if (err != GLEnum.NoError)
-            {
-                Console.WriteLine("Render Scene GL Error: " + err);
-            }
-
             foreach (var sceneObject in sceneObjects)
             {
                 if (sceneObject is M2Container activeM2)
                 {
-                    var m2 = activeM2.DoodadBatch;
+                    var m2 = Cache.GetOrLoadM2(gl, activeM2.FileDataId, m2ShaderProgram);
 
                     gl.UseProgram(m2ShaderProgram);
 
                     int modelview_location = gl.GetUniformLocation(m2ShaderProgram, "modelview_matrix");
-                    var modelviewMatrix = Matrix4x4.CreateRotationZ(MathF.PI / 180f * 90f);
+                    var modelviewMatrix = Matrix4x4.CreateRotationZ(MathF.PI / 180f * 180f);
                     gl.UniformMatrix4(modelview_location, 1, false, (float*)&modelviewMatrix);
 
                     int rotation_location = gl.GetUniformLocation(m2ShaderProgram, "rotation_matrix");
@@ -395,6 +428,7 @@ namespace WoWViewer.NET
                     gl.UniformMatrix4(projection_location, 1, false, (float*)&projectionMatrix);
 
                     var alphaRefLoc = gl.GetUniformLocation(m2ShaderProgram, "alphaRef");
+                    gl.ActiveTexture(TextureUnit.Texture0);
 
                     gl.BindVertexArray(m2.vao);
 
@@ -429,29 +463,52 @@ namespace WoWViewer.NET
 
                         gl.DrawElements(PrimitiveType.Triangles, submesh.numFaces, DrawElementsType.UnsignedInt, (void*)(submesh.firstFace * 4));
                     }
+
+                    var err = gl.GetError();
+                    if (err != GLEnum.NoError)
+                        Console.WriteLine("M2 render GL Error: " + err);
                 }
                 else if (sceneObject is WMOContainer wmoContainer)
                 {
-                    var wmo = wmoContainer.WorldModel;
+                    var wmo = Cache.GetOrLoadWMO(gl, sceneObject.FileDataId, wmoShaderProgram);
 
                     gl.UseProgram(wmoShaderProgram);
 
-                    int modelview_location = gl.GetUniformLocation(m2ShaderProgram, "modelview_matrix");
-                    var modelviewMatrix = Matrix4x4.CreateRotationZ(MathF.PI / 180f * -180f);
-                    gl.UniformMatrix4(modelview_location, 1, false, (float*)&modelviewMatrix);
-
-                    int rotation_location = gl.GetUniformLocation(m2ShaderProgram, "rotation_matrix");
-                    var rotationMatrix = activeCamera.GetViewMatrix();
-                    gl.UniformMatrix4(rotation_location, 1, false, (float*)&rotationMatrix);
-
-                    int projection_location = gl.GetUniformLocation(m2ShaderProgram, "projection_matrix");
+                    int projection_location = gl.GetUniformLocation(wmoShaderProgram, "projection_matrix");
                     var projectionMatrix = activeCamera.GetProjectionMatrix();
                     gl.UniformMatrix4(projection_location, 1, false, (float*)&projectionMatrix);
 
+                    int viewMatrixLoc = gl.GetUniformLocation(wmoShaderProgram, "view_matrix");
+                    var viewMatrix = activeCamera.GetViewMatrix();
+                    viewMatrix *= Matrix4x4.CreateRotationZ(MathF.PI / 180f * 180f);
+
+                    gl.UniformMatrix4(viewMatrixLoc, 1, false, (float*)&viewMatrix);
+
+                    // Model matrix contains position, rotation and scale
+                    int modelMatrixLoc = gl.GetUniformLocation(wmoShaderProgram, "model_matrix");
+                    var modelMatrix = Matrix4x4.CreateScale(1f);
+
+                    // Apply ADT rotation
+                    modelMatrix *= Matrix4x4.CreateRotationZ(MathF.PI / 180f * (wmoContainer.Rotation.Y - 270f));
+                    //modelMatrix *= Matrix4x4.CreateRotationX(MathF.PI / 180f * (-wmoContainer.Rotation.X));
+                    //modelMatrix *= Matrix4x4.CreateRotationY(MathF.PI / 180f * (wmoContainer.Rotation.Z - 90f));
+
+                    modelMatrix *= Matrix4x4.CreateTranslation(wmoContainer.Position.X, wmoContainer.Position.Z * -1, wmoContainer.Position.Y);
+
+                    // Post-transform rotation
+                    modelMatrix *= Matrix4x4.CreateRotationZ(MathF.PI / 180f * -270f);
+
+                    gl.UniformMatrix4(modelMatrixLoc, 1, false, (float*)&modelMatrix);
+
                     var alphaRefLoc = gl.GetUniformLocation(wmoShaderProgram, "alphaRef");
+
+                    gl.ActiveTexture(TextureUnit.Texture0);
 
                     for (var j = 0; j < wmo.wmoRenderBatch.Length; j++)
                     {
+                        if (wmo.groupBatches[wmo.wmoRenderBatch[j].groupID].vao == 0)
+                            continue;
+
                         gl.BindVertexArray(wmo.groupBatches[wmo.wmoRenderBatch[j].groupID].vao);
 
                         switch (wmo.wmoRenderBatch[j].blendType)
@@ -477,7 +534,83 @@ namespace WoWViewer.NET
 
                         gl.BindTexture(TextureTarget.Texture2D, wmo.wmoRenderBatch[j].materialID[0]);
                         gl.DrawElements(PrimitiveType.Triangles, wmo.wmoRenderBatch[j].numFaces, DrawElementsType.UnsignedInt, (void*)(wmo.wmoRenderBatch[j].firstFace * 4));
+                        
                     }
+
+                    var err = gl.GetError();
+                    if (err != GLEnum.NoError)
+                        Console.WriteLine("WMO render GL Error: " + err);
+                }
+                else if (sceneObject is ADTContainer adt)
+                {
+                    gl.UseProgram(adtShaderProgram);
+
+                    int modelview_location = gl.GetUniformLocation(adtShaderProgram, "modelview_matrix");
+                    var modelviewMatrix = Matrix4x4.CreateRotationZ(MathF.PI / 180f * 180f);
+                    gl.UniformMatrix4(modelview_location, 1, false, (float*)&modelviewMatrix);
+
+                    int rotation_location = gl.GetUniformLocation(adtShaderProgram, "rotation_matrix");
+                    var rotationMatrix = activeCamera.GetViewMatrix();
+                    gl.UniformMatrix4(rotation_location, 1, false, (float*)&rotationMatrix);
+
+                    int projection_location = gl.GetUniformLocation(adtShaderProgram, "projection_matrix");
+                    var projectionMatrix = activeCamera.GetProjectionMatrix();
+                    gl.UniformMatrix4(projection_location, 1, false, (float*)&projectionMatrix);
+
+                    var heightScaleLoc = gl.GetUniformLocation(adtShaderProgram, "pc_heightScale");
+                    var heightOffsetLoc = gl.GetUniformLocation(adtShaderProgram, "pc_heightOffset");
+
+                    gl.BindVertexArray(adt.Terrain.vao);
+
+                    for (int i = 0; i < adt.Terrain.renderBatches.Length; i++)
+                    {
+                        gl.Uniform4(heightScaleLoc, adt.Terrain.renderBatches[i].heightScales);
+                        gl.Uniform4(heightOffsetLoc, adt.Terrain.renderBatches[i].heightOffsets);
+
+                        for (int j = 0; j < adt.Terrain.renderBatches[i].materialID.Length; j++)
+                        {
+                            var textureLoc = gl.GetUniformLocation(adtShaderProgram, "pt_layer" + j);
+                            gl.Uniform1(textureLoc, j);
+
+                            var scaleLoc = gl.GetUniformLocation(adtShaderProgram, "layer" + j + "scale");
+                            gl.Uniform1(scaleLoc, adt.Terrain.renderBatches[i].scales[j]);
+
+                            gl.ActiveTexture(TextureUnit.Texture0 + j);
+                            gl.BindTexture(TextureTarget.Texture2D, adt.Terrain.renderBatches[i].materialID[j]);
+                        }
+
+                        for (int j = 1; j < adt.Terrain.renderBatches[i].alphaMaterialID.Length; j++)
+                        {
+                            var textureLoc = gl.GetUniformLocation(adtShaderProgram, "pt_blend" + j);
+                            gl.Uniform1(textureLoc, 3 + j);
+
+                            gl.ActiveTexture(TextureUnit.Texture3 + j);
+                            gl.BindTexture(TextureTarget.Texture2D, (uint)adt.Terrain.renderBatches[i].alphaMaterialID[j]);
+                        }
+
+                        for (int j = 0; j < adt.Terrain.renderBatches[i].heightMaterialIDs.Length; j++)
+                        {
+                            var textureLoc = gl.GetUniformLocation(adtShaderProgram, "pt_height" + j);
+                            gl.Uniform1(textureLoc, 7 + j);
+
+                            gl.ActiveTexture(TextureUnit.Texture7 + j);
+                            gl.BindTexture(TextureTarget.Texture2D, (uint)adt.Terrain.renderBatches[i].heightMaterialIDs[j]);
+                        }
+
+                        gl.DrawElements(PrimitiveType.Triangles, adt.Terrain.renderBatches[i].numFaces, DrawElementsType.UnsignedInt, (void*)(adt.Terrain.renderBatches[i].firstFace * 4));
+
+                        for (int j = 0; j < 11; j++)
+                        {
+                            gl.ActiveTexture(TextureUnit.Texture0 + j);
+                            gl.BindTexture(TextureTarget.Texture2D, 0);
+                        }
+
+                        gl.DrawRangeElements(PrimitiveType.Triangles, adt.Terrain.renderBatches[i].firstFace, adt.Terrain.renderBatches[i].firstFace + adt.Terrain.renderBatches[i].numFaces, adt.Terrain.renderBatches[i].numFaces, DrawElementsType.UnsignedInt, (void*)(adt.Terrain.renderBatches[i].firstFace * 4));
+                    }
+
+                    var err = gl.GetError();
+                    if (err != GLEnum.NoError)
+                        Console.WriteLine("ADT render GL Error: " + err);
                 }
             }
 

@@ -1,12 +1,14 @@
-﻿namespace WoWViewer.NET.Objects
+﻿using Silk.NET.OpenGL;
+using WoWViewer.NET.Renderer;
+
+namespace WoWViewer.NET.Objects
 {
     public class M2Container : Container3D
     {
-        public Renderer.Structs.DoodadBatch DoodadBatch { get; }
         public bool[] EnabledGeosets { get; }
-        public M2Container(Renderer.Structs.DoodadBatch m2, string fileName) : base(fileName)
+        public M2Container(GL gl, uint fileDataID, uint shaderProgram) : base(gl, fileDataID, shaderProgram)
         {
-            DoodadBatch = m2;
+            var m2 = Cache.GetOrLoadM2(gl, fileDataID, shaderProgram);
             EnabledGeosets = new bool[m2.submeshes.Length];
 
             // Is there no way to initialize an array of true bools?

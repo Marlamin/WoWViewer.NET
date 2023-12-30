@@ -48,7 +48,7 @@ public class Camera
 
     public Matrix4x4 GetProjectionMatrix()
     {
-        return Matrix4x4.CreatePerspectiveFieldOfView(DegreesToRadians(Zoom), AspectRatio, 0.1f, 4096.0f);
+        return Matrix4x4.CreatePerspectiveFieldOfView(DegreesToRadians(Zoom), AspectRatio, 10.0f, 4096.0f);
     }
     public static float DegreesToRadians(float degrees)
     {
