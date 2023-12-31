@@ -79,6 +79,15 @@ namespace WoWViewer.NET
                     inputContext = window.CreateInput()
                 );
 
+                ImGui.GetIO().ConfigFlags |= ImGuiConfigFlags.DockingEnable;
+                ImGui.GetIO().ConfigDockingAlwaysTabBar = true;
+
+                ImGui.GetStyle().WindowRounding = 5.0f;
+                ImGui.GetStyle().WindowPadding = new Vector2(0.0f, 0.0f);
+                ImGui.GetStyle().FrameRounding = 12.0f;
+
+                ImGui.DockSpaceOverViewport(ImGui.GetMainViewport());
+
                 for (int i = 0; i < inputContext.Mice.Count; i++)
                 {
                     //inputContext.Mice[i].Cursor.CursorMode = CursorMode.Raw;
@@ -249,6 +258,7 @@ namespace WoWViewer.NET
                     Console.WriteLine("loaded model");
                 }
 
+                ImGUIDockSpace();
                 if (!cascLoaded || !listfileLoaded)
                 {
                     if (!cascLoaded)
@@ -323,6 +333,44 @@ namespace WoWViewer.NET
             window.Run();
 
             window.Dispose();
+        }
+
+
+        private static void ImGUIDockSpace()
+        {
+            var opt_fullscreen = true;
+            var opt_padding = false;
+            var dockspace_flags = ImGuiDockNodeFlags.None | ImGuiDockNodeFlags.PassthruCentralNode | ImGuiDockNodeFlags.NoDockingInCentralNode;
+
+            ImGuiWindowFlags window_flags = ImGuiWindowFlags.NoDocking | ImGuiWindowFlags.NoBackground;
+
+            if (opt_fullscreen)
+            {
+                var viewport = ImGui.GetMainViewport();
+                ImGui.SetNextWindowPos(viewport.WorkPos);
+                ImGui.SetNextWindowSize(viewport.WorkSize);
+                ImGui.SetNextWindowViewport(viewport.ID);
+                ImGui.PushStyleVar(ImGuiStyleVar.WindowRounding, 0.0f);
+                ImGui.PushStyleVar(ImGuiStyleVar.WindowBorderSize, 0.0f);
+                window_flags |= ImGuiWindowFlags.NoTitleBar | ImGuiWindowFlags.NoCollapse | ImGuiWindowFlags.NoResize | ImGuiWindowFlags.NoMove;
+                window_flags |= ImGuiWindowFlags.NoBringToFrontOnFocus | ImGuiWindowFlags.NoNavFocus;
+            }
+  
+            dockspace_flags |= ImGuiDockNodeFlags.PassthruCentralNode;
+
+            ImGui.Begin("DockSpace Demo", window_flags);
+
+            if (!opt_padding)
+                ImGui.PopStyleVar();
+            if (opt_fullscreen)
+                ImGui.PopStyleVar(2);
+
+            // Submit the DockSpace
+            if (ImGui.GetIO().ConfigFlags.HasFlag(ImGuiConfigFlags.DockingEnable))
+            {
+                var dockspace_id = ImGui.GetID("MyDockSpace");
+                ImGui.DockSpace(dockspace_id, new Vector2(0.0f, 0.0f), dockspace_flags);
+            }
         }
 
         private static void ListfileWorker_DoWork(object? sender, DoWorkEventArgs e)
