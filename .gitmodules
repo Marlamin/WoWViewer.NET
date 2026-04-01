@@ -1,3 +1,12 @@
 [submodule "WoWViewer.NET/WoWFormatLib"]
 	path = WoWViewer.NET/WoWFormatLib
 	url = https://github.com/Marlamin/WoWFormatLib
+[submodule "WoWViewer.NET/BLPSharp"]
+	path = WoWViewer.NET/BLPSharp
+	url = https://github.com/wowdev/BLPSharp
+[submodule "WoWViewer.NET/CascLib"]
+	path = WoWViewer.NET/CascLib
+	url = https://github.com/marlamin/CascLib
+[submodule "WoWViewer.NET/TACTSharp"]
+	path = WoWViewer.NET/TACTSharp
+	url = https://github.com/wowdev/TACTSharp
