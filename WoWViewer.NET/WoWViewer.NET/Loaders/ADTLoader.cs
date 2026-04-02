@@ -3,6 +3,7 @@ using System.Numerics;
 using WoWFormatLib.FileProviders;
 using WoWFormatLib.FileReaders;
 using WoWFormatLib.Structs.ADT;
+using WoWFormatLib.Structs.WDT;
 using WoWViewer.NET.Renderer;
 using static WoWViewer.NET.Renderer.Structs;
 
@@ -10,17 +11,24 @@ namespace WoWViewer.NET.Loaders
 {
     class ADTLoader
     {
+        public static Dictionary<uint, WDT> wdtCache = [];
         public static unsafe Terrain LoadADT(GL gl, Structs.MapTile mapTile, uint shaderProgram, bool loadModels = false)
         {
             ADT adt = new ADT();
             Terrain result = new Terrain();
             ADTReader adtReader = new ADTReader();
-            var wdtReader = new WDTReader();
-            wdtReader.LoadWDT(mapTile.wdtFileDataID);
+
+            if (!wdtCache.TryGetValue(mapTile.wdtFileDataID, out WDT wdt))
+            {
+                var wdtReader = new WDTReader();
+                wdtReader.LoadWDT(mapTile.wdtFileDataID);
+                wdt = wdtReader.wdtfile;
+                wdtCache[mapTile.wdtFileDataID] = wdt;
+            }
 
             Listfile.FDIDToFilename.TryGetValue(mapTile.wdtFileDataID, out string wdtFilename);
 
-            adtReader.LoadADT(wdtReader.wdtfile, mapTile.tileX, mapTile.tileY, true, wdtFilename);
+            adtReader.LoadADT(wdt, mapTile.tileX, mapTile.tileY, true, wdtFilename);
             adt = adtReader.adtfile;
 
             var TileSize = 1600.0f / 3.0f; //533.333
@@ -173,12 +181,12 @@ namespace WoWViewer.NET.Loaders
                 }
                 batch.numFaces = (uint)(indicelist.Count) - batch.firstFace;
 
-                var layerMaterials = new List<int>(8){ -1, -1, -1, -1, -1, -1, -1, -1 };
-                var alphalayermats = new List<int>(8){ -1, -1, -1, -1, -1, -1, -1, -1 };
+                var layerMaterials = new List<int>(8) { -1, -1, -1, -1, -1, -1, -1, -1 };
+                var alphalayermats = new List<int>(8) { -1, -1, -1, -1, -1, -1, -1, -1 };
                 var layerheights = new List<int>(8) { -1, -1, -1, -1, -1, -1, -1, -1 };
 
-                var layerscales = new List<float>(8){ 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f };
-                var heightScales = new List<float>(8){ 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f };
+                var layerscales = new List<float>(8) { 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f };
+                var heightScales = new List<float>(8) { 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f };
                 var heightOffsets = new List<float>(8) { 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f };
                 for (var li = 0; li < adt.chunks[c].layers.Length; li++)
                 {

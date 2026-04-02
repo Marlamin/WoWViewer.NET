@@ -36,7 +36,10 @@ namespace WoWViewer.NET
 
         private static Camera activeCamera;
         private static IInputContext inputContext;
-        private static List<Container3D> sceneObjects = new();
+
+        public static List<Container3D> sceneObjects = new();
+        public static Lock sceneObjectLock = new();
+
         private static IWindow window;
         private static Vector2 LastMousePosition;
 
@@ -185,7 +188,6 @@ namespace WoWViewer.NET
                 m2ShaderProgram = ShaderCompiler.CompileShader("m2");
                 shadersReady = true;
 
-
                 // sw new Vector3(-8938, 625, 200)
                 // 32 new Vector3(0, 0, 200)
                 // amird new Vector3(-138, 8208, 200)
@@ -283,6 +285,7 @@ namespace WoWViewer.NET
                     activeCamera.Position = Vector3.One;
                 }
 
+#if DEBUG
                 // Note -- this is extremely slow but allows for shader hot-reloading
                 foreach (var file in Directory.GetFiles(Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), "Shaders"), "*.shader"))
                 {
@@ -309,6 +312,7 @@ namespace WoWViewer.NET
                         shaderMTimes[file] = File.GetLastWriteTime(file);
                     }
                 }
+#endif
             };
 
             window.Render += delta =>
@@ -389,20 +393,24 @@ namespace WoWViewer.NET
                             {
                                 if (usedUUIDs.Contains(worldModel.uniqueID))
                                     continue;
-                                var worldModelContainer = new WMOContainer(gl, worldModel.fileDataID, wmoShaderProgram);
-                                worldModelContainer.Position = worldModel.position;
-                                worldModelContainer.Rotation = worldModel.rotation;
-                                worldModelContainer.Scale = worldModel.scale;
+                                var worldModelContainer = new WMOContainer(gl, worldModel.fileDataID, wmoShaderProgram)
+                                {
+                                    Position = worldModel.position,
+                                    Rotation = worldModel.rotation,
+                                    Scale = worldModel.scale
+                                };
                                 sceneObjects.Add(worldModelContainer);
                                 usedUUIDs.Add(worldModel.uniqueID);
                             }
 
                             foreach (var doodad in adt.doodads)
                             {
-                                var doodadContainer = new M2Container(gl, doodad.fileDataID, m2ShaderProgram);
-                                doodadContainer.Position = doodad.position;
-                                doodadContainer.Rotation = doodad.rotation;
-                                doodadContainer.Scale = doodad.scale;
+                                var doodadContainer = new M2Container(gl, doodad.fileDataID, m2ShaderProgram)
+                                {
+                                    Position = doodad.position,
+                                    Rotation = doodad.rotation,
+                                    Scale = doodad.scale
+                                };
                                 sceneObjects.Add(doodadContainer);
                             }
                         }
