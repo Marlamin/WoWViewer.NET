@@ -76,8 +76,9 @@ namespace WoWViewer.NET
             windowOptions.Title = "WoWViewer.NET";
             window = Window.Create(windowOptions);
 
+#if DEBUG
             RenderDoc.Load(out RenderDoc renderDoc);
-
+#endif
             gl = null;
 
             ImGuiController imGuiController = null;
