@@ -12,7 +12,7 @@ in vec2 texCoord;
 in vec2 texCoord2;
 in vec2 texCoord3;
 in vec2 texCoord4;
-in vec4 color;
+in vec4 color1;
 in vec4 color2;
 in vec4 color3;
 
@@ -21,7 +21,7 @@ out vec2 TexCoord;
 out vec2 TexCoord2;
 out vec2 TexCoord3;
 out vec2 TexCoord4;
-out vec4 vColor;
+out vec4 vColor1;
 out vec4 vColor2;
 out vec4 vColor3;
 
@@ -45,7 +45,7 @@ void main()
     mat4 viewModelMatForNormal = transpose(inverse(view_matrix));
     Normal = normalize(viewModelMatForNormal * vec4(normal, 0.0)).xyz;
 
-    vColor = color;
+    vColor1 = color1;
     vColor2 = color2;
     vColor3 = color3;
 
@@ -94,10 +94,11 @@ void main()
     } else if (VertexShader == 8) { //MapObjParallax
         TexCoord = texCoord;
         TexCoord2 = texCoord2;
-        TexCoord3 = texCoord3;
     } else {
         TexCoord = vec2(0.0, 1.0);
         TexCoord2 = vec2(0.0, 1.0);
         TexCoord3 = vec2(0.0, 1.0);
     }
+
+    TexCoord4 = texCoord4;
 }

@@ -5,7 +5,7 @@ in vec2 TexCoord;
 in vec2 TexCoord2;
 in vec2 TexCoord3;
 in vec2 TexCoord4;
-in vec4 vColor;
+in vec4 vColor1;
 in vec4 vColor2;
 in vec4 vColor3;
 out vec4 outputColor;

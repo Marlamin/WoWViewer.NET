@@ -351,9 +351,10 @@ namespace WoWViewer.NET
                     //    }
                     //}
 
-                    //var wmoContainer = new WMOContainer(gl, 2756726, wmoShaderProgram);
-                    //var wmoContainer = new WMOContainer(gl, 5386825, wmoShaderProgram);
-                    var wmoContainer = new WMOContainer(gl, 3924066, wmoShaderProgram);
+                    //var wmoContainer = new WMOContainer(gl, 2756726, wmoShaderProgram); // hs tavern
+                    //var wmoContainer = new WMOContainer(gl, 5386825, wmoShaderProgram); // goblin building
+                    //var wmoContainer = new WMOContainer(gl, 3924066, wmoShaderProgram); // dragon inn
+                    var wmoContainer = new WMOContainer(gl, 6653586, wmoShaderProgram); // human folktower
                     wmoContainer.Position = new Vector3(34f, 17f, 42f);
                     wmoContainer.Scale = 1f;
                     sceneObjects.Add(wmoContainer);

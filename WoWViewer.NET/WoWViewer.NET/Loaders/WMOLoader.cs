@@ -99,7 +99,7 @@ namespace WoWViewer.NET.Loaders
                     }
                     else
                     {
-                        wmovertices[i].Color = new Vector4(1.0f, 1.0f, 1.0f, 1.0f);
+                        wmovertices[i].Color = new Vector4(0.0f, 0.0f, 0.0f, 0.0f);
                     }
 
                     if (wmo.group[g].mogp.colors2 != null)
@@ -108,7 +108,7 @@ namespace WoWViewer.NET.Loaders
                     }
                     else
                     {
-                        wmovertices[i].Color2 = new Vector4(1.0f, 1.0f, 1.0f, 1.0f);
+                        wmovertices[i].Color2 = new Vector4(0.0f, 0.0f, 0.0f, 0.0f);
                     }
 
                     if (wmo.group[g].mogp.colors3 != null)
@@ -117,7 +117,7 @@ namespace WoWViewer.NET.Loaders
                     }
                     else
                     {
-                        wmovertices[i].Color3 = new Vector4(1.0f, 1.0f, 1.0f, 1.0f);
+                        wmovertices[i].Color3 = new Vector4(0.0f, 0.0f, 0.0f, 0.0f);
                     }
                 }
 
@@ -140,6 +140,7 @@ namespace WoWViewer.NET.Loaders
                 var texCoord3Attrib = gl.GetAttribLocation(shaderProgram, "texCoord3");
                 gl.EnableVertexAttribArray((uint)texCoord3Attrib);
                 gl.VertexAttribPointer((uint)texCoord3Attrib, 2, VertexAttribPointerType.Float, false, sizeof(float) * 26, (void*)(sizeof(float) * 7));
+
                 var texCoord4Attrib = gl.GetAttribLocation(shaderProgram, "texCoord4");
                 gl.EnableVertexAttribArray((uint)texCoord4Attrib);
                 gl.VertexAttribPointer((uint)texCoord4Attrib, 2, VertexAttribPointerType.Float, false, sizeof(float) * 26, (void*)(sizeof(float) * 9));
@@ -148,7 +149,7 @@ namespace WoWViewer.NET.Loaders
                 gl.EnableVertexAttribArray((uint)posAttrib);
                 gl.VertexAttribPointer((uint)posAttrib, 3, VertexAttribPointerType.Float, false, sizeof(float) * 26, (void*)(sizeof(float) * 11));
 
-                var colorAttrib = gl.GetAttribLocation(shaderProgram, "color");
+                var colorAttrib = gl.GetAttribLocation(shaderProgram, "color1");
                 gl.EnableVertexAttribArray((uint)colorAttrib);
                 gl.VertexAttribPointer((uint)colorAttrib, 4, VertexAttribPointerType.Float, false, sizeof(float) * 26, (void*)(sizeof(float) * 14));
 
