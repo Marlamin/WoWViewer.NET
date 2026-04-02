@@ -45,7 +45,6 @@ void main()
 
         matDiffuse = tex.rgb;
         finalOpacity = tex.a;
-
     } else if (uPixelShader == 1) { //MapObjSpecular
 
         matDiffuse = tex.rgb;
@@ -85,7 +84,7 @@ void main()
         finalOpacity = tex.a;
     } else if (uPixelShader == 7) { //MapObjTwoLayerEnvMetal
 
-        vec4 colorMix = mix(tex, tex2, 1.0 - vColor2.a);
+        vec4 colorMix = mix(tex, tex, 1.0 - vColor2.a);
 
         matDiffuse = colorMix.rgb ;
         emissive = (colorMix.rgb * colorMix.a) * tex3.rgb * distFade;
@@ -99,7 +98,6 @@ void main()
 
         matDiffuse = mix(layer2, layer1, vColor2.a);
         //spec = calcSpec(tex2.a * (1.0 - vColor2.a));
-
         finalOpacity = tex.a;
 
     } else if (uPixelShader == 9) { //MapObjDiffuseEmissive
@@ -125,8 +123,9 @@ void main()
         finalOpacity = tex.a;
        
     } else if (uPixelShader == 12) { //MapObjTwoLayerDiffuseOpaque
-        matDiffuse = mix(tex2.rgb, tex.rgb, vColor2.a);
+        matDiffuse = mix(tex2.rgb, tex.rgb, vColor1.a);
         finalOpacity = 1.0;
+        
     } else if (uPixelShader == 13) { //MapObjTwoLayerDiffuseEmissive
         vec3 t1diffuse = (tex2.rgb * (1.0 - tex2.a));
 
