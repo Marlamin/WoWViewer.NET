@@ -43,6 +43,7 @@ namespace WoWViewer.NET
         private static IWindow window;
         private static Vector2 LastMousePosition;
 
+        private static bool renderADT = true;
         private static bool renderWMO = true;
         private static bool renderM2 = false;
         private static bool shadersReady = false;
@@ -434,6 +435,7 @@ namespace WoWViewer.NET
                 {
                     ImGui.Begin("3D debug");
 
+                    ImGui.Checkbox("Render ADT", ref renderADT);
                     ImGui.Checkbox("Render WMO", ref renderWMO);
                     ImGui.Checkbox("Render M2", ref renderM2);
                     var newPos = activeCamera.Position;
@@ -781,6 +783,9 @@ namespace WoWViewer.NET
                 }
                 else if (sceneObject is ADTContainer adt)
                 {
+                    if(!renderADT)
+                        continue;
+
                     gl.UseProgram(adtShaderProgram);
 
                     var modelviewMatrix = Matrix4x4.CreateRotationZ(MathF.PI / 180f * 180f);
