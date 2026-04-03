@@ -50,6 +50,11 @@ namespace WoWViewer.NET
 
         private static uint defaultTextureID;
 
+        private static Queue<(byte x, byte y)> tilesToLoad = new();
+        private static int totalTilesToLoad = 0;
+        private static HashSet<uint> usedUUIDs = new();
+        private static HashSet<(byte x, byte y)> loadedTiles = new();
+
         static void Main(string[] args)
         {
             var windowOptions = WindowOptions.Default;
@@ -60,7 +65,7 @@ namespace WoWViewer.NET
             window = Window.Create(windowOptions);
 
 #if DEBUG
-            RenderDoc.Load(out RenderDoc renderDoc);
+            Evergine.Bindings.RenderDoc.RenderDoc.Load(out Evergine.Bindings.RenderDoc.RenderDoc renderDoc);
 #endif
             gl = null;
 
@@ -239,53 +244,69 @@ namespace WoWViewer.NET
                 gl.ClearColor(0f, 0f, 0f, 0.5f);
                 gl.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
 
-                if (cascLoaded && sceneObjects.Count == 0 && !sceneLoaded)
+                if (cascLoaded && !sceneLoaded && tilesToLoad.Count == 0)
                 {
-                    sceneLoaded = true;
-                    Console.WriteLine("Loading");
-                    var usedUUIDs = new List<uint>();
-
                     byte startX = 32;
                     byte startY = 32;
                     for (byte x = startX; x < startX + 3; x++)
-                    {
                         for (byte y = startY; y < startY + 3; y++)
+                            tilesToLoad.Enqueue((x, y));
+                    
+                    totalTilesToLoad = tilesToLoad.Count;
+                }
+
+                if (tilesToLoad.Count > 0)
+                {
+                    var (x, y) = tilesToLoad.Dequeue();
+                    var tilesLoaded = totalTilesToLoad - tilesToLoad.Count;
+                    statusMessage = $"Loading tile {x},{y} ({tilesLoaded}/{totalTilesToLoad})...";
+
+                    var mapTile = new Structs.MapTile();
+                    mapTile.tileX = x;
+                    mapTile.tileY = y;
+                    mapTile.wdtFileDataID = 775971;
+
+                    var adt = Loaders.ADTLoader.LoadADT(gl, mapTile, adtShaderProgram, true);
+                    var adtContainer = new ADTContainer(gl, adt, mapTile.wdtFileDataID, adtShaderProgram);
+                    sceneObjects.Add(adtContainer);
+
+                    foreach (var worldModel in adt.worldModelBatches)
+                    {
+                        if (usedUUIDs.Contains(worldModel.uniqueID))
+                            continue;
+                        var worldModelContainer = new WMOContainer(gl, worldModel.fileDataID, wmoShaderProgram)
                         {
-                            var mapTile = new Structs.MapTile();
-                            mapTile.tileX = x;
-                            mapTile.tileY = y;
-                            mapTile.wdtFileDataID = 775971;
-                            var adt = Loaders.ADTLoader.LoadADT(gl, mapTile, adtShaderProgram, true);
-                            var adtContainer = new ADTContainer(gl, adt, mapTile.wdtFileDataID, adtShaderProgram);
-                            sceneObjects.Add(adtContainer);
+                            Position = worldModel.position,
+                            Rotation = worldModel.rotation,
+                            Scale = worldModel.scale
+                        };
+                        sceneObjects.Add(worldModelContainer);
+                        usedUUIDs.Add(worldModel.uniqueID);
+                    }
 
-                            foreach (var worldModel in adt.worldModelBatches)
-                            {
-                                if (usedUUIDs.Contains(worldModel.uniqueID))
-                                    continue;
-                                var worldModelContainer = new WMOContainer(gl, worldModel.fileDataID, wmoShaderProgram)
-                                {
-                                    Position = worldModel.position,
-                                    Rotation = worldModel.rotation,
-                                    Scale = worldModel.scale
-                                };
-                                sceneObjects.Add(worldModelContainer);
-                                usedUUIDs.Add(worldModel.uniqueID);
-                            }
+                    foreach (var doodad in adt.doodads)
+                    {
+                        var doodadContainer = new M2Container(gl, doodad.fileDataID, m2ShaderProgram)
+                        {
+                            Position = doodad.position,
+                            Rotation = doodad.rotation,
+                            Scale = doodad.scale
+                        };
+                        sceneObjects.Add(doodadContainer);
+                    }
 
-                            foreach (var doodad in adt.doodads)
-                            {
-                                var doodadContainer = new M2Container(gl, doodad.fileDataID, m2ShaderProgram)
-                                {
-                                    Position = doodad.position,
-                                    Rotation = doodad.rotation,
-                                    Scale = doodad.scale
-                                };
-                                sceneObjects.Add(doodadContainer);
-                            }
-                        }
+                    // Mark this tile as loaded
+                    loadedTiles.Add((x, y));
+
+                    if (tilesToLoad.Count == 0)
+                    {
+                        sceneLoaded = true;
+                        statusMessage = "";
                     }
                 }
+
+                // Check if camera has moved to an unloaded tile
+                CheckAndLoadTileAtCameraPosition();
 
                 ImGUIDockSpace();
 
@@ -326,6 +347,8 @@ namespace WoWViewer.NET
                     activeCamera.Roll = roll;
 
                     ImGui.Text(sceneObjects.Count.ToString() + " loaded objects (" + sceneObjects.Count(x => x is M2Container).ToString() + " M2, " + sceneObjects.Count(x => x is WMOContainer).ToString() + " WMO, " + sceneObjects.Count(x => x is ADTContainer).ToString() + " ADT)");
+
+                    ImGui.Text("Current ADT: " + GetTileFromPosition(activeCamera.Position).ToString());
 
                     var i = 0;
                     if (ImGui.CollapsingHeader("Loaded WMOs"))
@@ -707,6 +730,51 @@ namespace WoWViewer.NET
             }
 
             gl.BindVertexArray(0);
+        }
+
+        private static (byte x, byte y) GetTileFromPosition(Vector3 position)
+        {
+            const float tileSize = 533.33333f;
+            const int mapCenter = 32;
+
+            // todo: this is not super correct but close enough for 3x3 load, check math with minimap tool at some point
+            int tileX = mapCenter - (int)Math.Floor(position.Y / tileSize);
+            int tileY = mapCenter - (int)Math.Floor(position.X / tileSize);
+
+            tileX = Math.Clamp(tileX, 0, 63);
+            tileY = Math.Clamp(tileY, 0, 63);
+
+            return ((byte)tileX, (byte)tileY);
+        }
+
+        private static void CheckAndLoadTileAtCameraPosition()
+        {
+            if (!cascLoaded || !sceneLoaded)
+                return;
+
+            var currentTile = GetTileFromPosition(activeCamera.Position);
+
+            for (int xOffset = -1; xOffset <= 1; xOffset++)
+            {
+                for (int yOffset = -1; yOffset <= 1; yOffset++)
+                {
+                    int tileX = currentTile.x + xOffset;
+                    int tileY = currentTile.y + yOffset;
+
+                    // oob check
+                    if (tileX < 0 || tileX > 63 || tileY < 0 || tileY > 63)
+                        continue;
+
+                    var tile = ((byte)tileX, (byte)tileY);
+
+                    if (!loadedTiles.Contains(tile) && !tilesToLoad.Contains(tile))
+                    {
+                        Console.WriteLine($"Queuing tile {tile.Item1},{tile.Item2} for load (3x3 around camera, which is in tile {currentTile.x},{currentTile.y})");
+                        tilesToLoad.Enqueue(tile);
+                        totalTilesToLoad++;
+                    }
+                }
+            }
         }
 
         private static unsafe uint MakeDefaultTexture()
