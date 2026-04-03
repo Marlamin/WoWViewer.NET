@@ -48,29 +48,11 @@ namespace WoWViewer.NET
         private static bool renderM2 = false;
         private static bool shadersReady = false;
 
-        private static Dictionary<string, DateTime> shaderMTimes = new();
-
-        private static List<TimelineScene> scenes = new();
+        private static readonly Dictionary<string, DateTime> shaderMTimes = [];
+        private static readonly List<TimelineScene> scenes = [];
 
         private static uint defaultTextureID;
 
-        private static unsafe uint MakeDefaultTexture()
-        {
-            var defaultTexture = gl.GenTexture();
-            gl.BindTexture(TextureTarget.Texture2D, defaultTexture);
-            byte[] fill = [0, 0, 0, 0];
-            fixed (byte* fillPtr = fill)
-            {
-                gl.TexImage2D(TextureTarget.Texture2D, 0, InternalFormat.Rgba8, 1, 1, 0, PixelFormat.Rgba, PixelType.UnsignedByte, fillPtr);
-            }
-
-            gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Linear);
-            gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Linear);
-            gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)TextureWrapMode.Repeat);
-            gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, (int)TextureWrapMode.Repeat);
-
-            return defaultTexture;
-        }
         static void Main(string[] args)
         {
             var windowOptions = WindowOptions.Default;
@@ -194,7 +176,7 @@ namespace WoWViewer.NET
                 // amird new Vector3(-138, 8208, 200)
 
                 // wmo test new Vector3(-29.472f, 33.547f, 32.624f)
-                activeCamera = new Camera(new Vector3(4292.753f, -1930.982f, 547f), Vector3.UnitX, Vector3.UnitZ * -1, (float)window.FramebufferSize.X / (float)window.FramebufferSize.Y);
+                activeCamera = new Camera(new Vector3(0f, -0f, 200f), Vector3.UnitX, Vector3.UnitZ * -1, (float)window.FramebufferSize.X / (float)window.FramebufferSize.Y);
                 gl.Viewport(window.FramebufferSize);
                 gl.ClearColor(1.0f, 0.0f, 0.0f, 1.0f);
 
@@ -254,26 +236,18 @@ namespace WoWViewer.NET
                     moveSpeed *= 2.0f;
 
                 imGuiController.Update((float)delta);
+
                 if (primaryKeyboard.IsKeyPressed(Key.W))
-                {
-                    //Move forwards
                     activeCamera.Position += moveSpeed * activeCamera.Front;
-                }
+
                 if (primaryKeyboard.IsKeyPressed(Key.S))
-                {
-                    //Move backwards
                     activeCamera.Position -= moveSpeed * activeCamera.Front;
-                }
+
                 if (primaryKeyboard.IsKeyPressed(Key.A))
-                {
-                    //Move left
                     activeCamera.Position += Vector3.Normalize(Vector3.Cross(activeCamera.Front, activeCamera.Up)) * moveSpeed;
-                }
+
                 if (primaryKeyboard.IsKeyPressed(Key.D))
-                {
-                    //Move right
                     activeCamera.Position -= Vector3.Normalize(Vector3.Cross(activeCamera.Front, activeCamera.Up)) * moveSpeed;
-                }
 
                 if (primaryKeyboard.IsKeyPressed(Key.Up))
                     activeCamera.Position -= moveSpeed * activeCamera.Up;
@@ -282,9 +256,7 @@ namespace WoWViewer.NET
                     activeCamera.Position += moveSpeed * activeCamera.Up;
 
                 if (primaryKeyboard.IsKeyPressed(Key.R))
-                {
                     activeCamera.Position = Vector3.One;
-                }
 
 #if DEBUG
                 // Note -- this is extremely slow but allows for shader hot-reloading
@@ -373,8 +345,8 @@ namespace WoWViewer.NET
                     // sw 29 47
                     // amird 16 32
                     // valdr 33 31
-                    byte startX = 37;
-                    byte startY = 22;
+                    byte startX = 32;
+                    byte startY = 32;
                     for (byte x = startX; x < startX + 3; x++)
                     {
                         for (byte y = startY; y < startY + 3; y++)
@@ -461,15 +433,6 @@ namespace WoWViewer.NET
                     var roll = activeCamera.Roll;
                     ImGui.DragFloat("Camera roll", ref roll);
                     activeCamera.Roll = roll;
-
-                    //var modelviewMatrix = Matrix4x4.CreateRotationZ(MathF.PI / 180f * 90f);
-                    //ImGuiExtensions.DrawMatrix4x4("Modelview matrix", modelviewMatrix);
-
-                    //var rotationMatrix = activeCamera.GetViewMatrix();
-                    //ImGuiExtensions.DrawMatrix4x4("Rotation matrix", rotationMatrix);
-
-                    //var projectionMatrix = activeCamera.GetProjectionMatrix();
-                    //ImGuiExtensions.DrawMatrix4x4("Projection matrix", projectionMatrix);
 
                     ImGui.Text(sceneObjects.Count.ToString() + " loaded objects (" + sceneObjects.Count(x => x is M2Container).ToString() + " M2, " + sceneObjects.Count(x => x is WMOContainer).ToString() + " WMO, " + sceneObjects.Count(x => x is ADTContainer).ToString() + " ADT)");
 
@@ -583,7 +546,7 @@ namespace WoWViewer.NET
             }
         }
 
-        private static unsafe void OnMouseMove(IMouse mouse, Vector2 position)
+        private static void OnMouseMove(IMouse mouse, Vector2 position)
         {
 
             if (!mouse.IsButtonPressed(MouseButton.Left) || ImGui.IsWindowHovered(ImGuiHoveredFlags.AnyWindow) || ImGui.IsAnyItemActive())
@@ -603,7 +566,7 @@ namespace WoWViewer.NET
                 activeCamera.ModifyDirection(xOffset, yOffset);
             }
         }
-        private static unsafe void OnMouseWheel(IMouse mouse, ScrollWheel scrollWheel)
+        private static void OnMouseWheel(IMouse mouse, ScrollWheel scrollWheel)
         {
             if (ImGui.IsWindowHovered(ImGuiHoveredFlags.AnyWindow) || ImGui.IsAnyItemActive())
                 return;
@@ -784,7 +747,6 @@ namespace WoWViewer.NET
                             gl.BindTexture(TextureTarget.Texture2D, 0);
                         }
                     }
-
 #if DEBUG
                     var err = gl.GetError();
                     if (err != GLEnum.NoError)
@@ -856,6 +818,23 @@ namespace WoWViewer.NET
             gl.BindVertexArray(0);
         }
 
+        private static unsafe uint MakeDefaultTexture()
+        {
+            var defaultTexture = gl.GenTexture();
+            gl.BindTexture(TextureTarget.Texture2D, defaultTexture);
+            byte[] fill = [0, 0, 0, 0];
+            fixed (byte* fillPtr = fill)
+            {
+                gl.TexImage2D(TextureTarget.Texture2D, 0, InternalFormat.Rgba8, 1, 1, 0, PixelFormat.Rgba, PixelType.UnsignedByte, fillPtr);
+            }
+
+            gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Linear);
+            gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Linear);
+            gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)TextureWrapMode.Repeat);
+            gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, (int)TextureWrapMode.Repeat);
+
+            return defaultTexture;
+        }
         private static void SwitchBlendMode(int blendType, GL gl, int alphaRefLoc)
         {
             switch (blendType)

@@ -54,9 +54,7 @@ namespace WoWViewer.NET
                 }
 
                 FDIDToFilename.Add(fileDataId, tokens[1]);
-
-                if (!FilenameToFDID.ContainsKey(tokens[1]))
-                    FilenameToFDID.Add(tokens[1], fileDataId);
+                FilenameToFDID.TryAdd(tokens[1], fileDataId);
             }
         }
 
