@@ -13,16 +13,16 @@ namespace WoWViewer.NET.Loaders
         private static uint DEFAULT_TEXTURE_ID = 528732; // dungeons/textures/testing/color_01.blp
         private static uint MISSING_TEXTURE_ID = 186184; // textures/shanecube.blp
 
-        public static DoodadBatch LoadM2(GL gl, string fileName, uint shaderProgram)
-        {
-            fileName = fileName.ToLower().Replace(".mdx", ".m2");
-            fileName = fileName.ToLower().Replace(".mdl", ".m2");
+        //public static DoodadBatch LoadM2(GL gl, string fileName, uint shaderProgram)
+        //{
+        //    fileName = fileName.ToLower().Replace(".mdx", ".m2");
+        //    fileName = fileName.ToLower().Replace(".mdl", ".m2");
 
-            if (Listfile.TryGetFileDataID(fileName, out var fileDataID))
-                return LoadM2(gl, fileDataID, shaderProgram);
-            else
-                throw new Exception("Filename " + fileName + " does not exist in listfile!");
-        }
+        //    if (Listfile.TryGetFileDataID(fileName, out var fileDataID))
+        //        return LoadM2(gl, fileDataID, shaderProgram);
+        //    else
+        //        throw new Exception("Filename " + fileName + " does not exist in listfile!");
+        //}
 
         public static unsafe DoodadBatch LoadM2(GL gl, uint fileDataID, uint shaderProgram)
         {

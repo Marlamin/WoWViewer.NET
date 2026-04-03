@@ -6,13 +6,13 @@ namespace WoWViewer.NET.Loaders
 {
     public static class BLPLoader
     {
-        public static uint LoadTexture(GL gl, string fileName)
-        {
-            if (Listfile.TryGetFileDataID(fileName, out var fileDataID))
-                return LoadTexture(gl, fileDataID);
-            else
-                throw new Exception("Couldn't find filedataid for file " + fileName + " in listfile!");
-        }
+        //public static uint LoadTexture(GL gl, string fileName)
+        //{
+        //    if (Listfile.TryGetFileDataID(fileName, out var fileDataID))
+        //        return LoadTexture(gl, fileDataID);
+        //    else
+        //        throw new Exception("Couldn't find filedataid for file " + fileName + " in listfile!");
+        //}
 
         public static unsafe uint LoadTexture(GL gl, uint fileDataID)
         {

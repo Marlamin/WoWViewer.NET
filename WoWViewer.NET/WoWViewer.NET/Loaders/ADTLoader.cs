@@ -89,45 +89,47 @@ namespace WoWViewer.NET.Loaders
             }
             else
             {
-                for (var ti = 0; ti < adt.textures.filenames.Length; ti++)
-                {
-                    var material = new Material();
-                    material.filename = adt.textures.filenames[ti];
-                    material.textureID = BLPLoader.LoadTexture(gl, adt.textures.filenames[ti]);
+                //for (var ti = 0; ti < adt.textures.filenames.Length; ti++)
+                //{
+                //    var material = new Material();
+                //    material.filename = adt.textures.filenames[ti];
+                //    material.textureID = BLPLoader.LoadTexture(gl, adt.textures.filenames[ti]);
 
-                    if (adt.texParams != null && adt.texParams.Length >= ti)
-                    {
-                        material.scale = (float)Math.Pow(2, (adt.texParams[ti].flags & 0xF0) >> 4);
-                        if (adt.texParams[ti].height != 0.0 || adt.texParams[ti].offset != 1.0)
-                        {
-                            material.heightScale = adt.texParams[ti].height;
-                            material.heightOffset = adt.texParams[ti].offset;
+                //    if (adt.texParams != null && adt.texParams.Length >= ti)
+                //    {
+                //        material.scale = (float)Math.Pow(2, (adt.texParams[ti].flags & 0xF0) >> 4);
+                //        if (adt.texParams[ti].height != 0.0 || adt.texParams[ti].offset != 1.0)
+                //        {
+                //            material.heightScale = adt.texParams[ti].height;
+                //            material.heightOffset = adt.texParams[ti].offset;
 
-                            var heightName = adt.textures.filenames[ti].Replace(".blp", "_h.blp");
-                            if (!FileProvider.FileExists(heightName))
-                            {
-                                Console.WriteLine("Height texture: " + heightName + " does not exist! Falling back to original texture (hack)..");
-                                material.heightTexture = BLPLoader.LoadTexture(gl, adt.textures.filenames[ti]);
-                            }
-                            else
-                            {
-                                material.heightTexture = BLPLoader.LoadTexture(gl, heightName);
-                            }
-                        }
-                        else
-                        {
-                            material.heightScale = 0.0f;
-                            material.heightOffset = 1.0f;
-                        }
-                    }
-                    else
-                    {
-                        material.heightScale = 0.0f;
-                        material.heightOffset = 1.0f;
-                        material.scale = 1.0f;
-                    }
-                    materials.Add(material);
-                }
+                //            var heightName = adt.textures.filenames[ti].Replace(".blp", "_h.blp");
+                //            if (!FileProvider.FileExists(heightName))
+                //            {
+                //                Console.WriteLine("Height texture: " + heightName + " does not exist! Falling back to original texture (hack)..");
+                //                material.heightTexture = BLPLoader.LoadTexture(gl, adt.textures.filenames[ti]);
+                //            }
+                //            else
+                //            {
+                //                material.heightTexture = BLPLoader.LoadTexture(gl, heightName);
+                //            }
+                //        }
+                //        else
+                //        {
+                //            material.heightScale = 0.0f;
+                //            material.heightOffset = 1.0f;
+                //        }
+                //    }
+                //    else
+                //    {
+                //        material.heightScale = 0.0f;
+                //        material.heightOffset = 1.0f;
+                //        material.scale = 1.0f;
+                //    }
+                //    materials.Add(material);
+                //}
+
+                throw new Exception("Filename-based loading yeeted");
             }
 
 

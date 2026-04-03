@@ -10,16 +10,16 @@ namespace WoWViewer.NET.Loaders
 {
     public class WMOLoader
     {
-        public static unsafe WorldModel LoadWMO(GL gl, string fileName, uint shaderProgram)
-        {
-            if (!Listfile.TryGetFileDataID(fileName, out uint fileDataID))
-                Console.WriteLine("Could not get filedataid for " + fileName);
+        //public static unsafe WorldModel LoadWMO(GL gl, string fileName, uint shaderProgram)
+        //{
+        //    if (!Listfile.TryGetFileDataID(fileName, out uint fileDataID))
+        //        Console.WriteLine("Could not get filedataid for " + fileName);
 
-            if (!FileProvider.FileExists(fileDataID))
-                throw new Exception("WMO " + fileName + " does not exist!");
+        //    if (!FileProvider.FileExists(fileDataID))
+        //        throw new Exception("WMO " + fileName + " does not exist!");
 
-            return LoadWMO(gl, fileDataID, shaderProgram, fileName);
-        }
+        //    return LoadWMO(gl, fileDataID, shaderProgram, fileName);
+        //}
 
         public static unsafe WorldModel LoadWMO(GL gl, uint fileDataID, uint shaderProgram, string fileName = "")
         {
