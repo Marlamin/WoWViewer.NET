@@ -560,7 +560,7 @@ namespace WoWViewer.NET
             else
             {
                 var xOffset = (position.X - LastMousePosition.X) * lookSensitivity;
-                var yOffset = (position.Y - LastMousePosition.Y) * lookSensitivity;
+                var yOffset = (LastMousePosition.Y - position.Y) * lookSensitivity;
                 LastMousePosition = position;
 
                 activeCamera.ModifyDirection(xOffset, yOffset);
