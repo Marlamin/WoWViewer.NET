@@ -8,9 +8,9 @@ namespace WoWViewer.NET.Objects
         public bool[] EnabledGroups { get; }
         public bool[] EnabledDoodadSets { get; }
 
-        public WMOContainer(GL gl, uint fileDataID, uint shaderProgram) : base(gl, fileDataID, shaderProgram)
+        public WMOContainer(GL gl, uint fileDataID, uint shaderProgram, uint parentFileDataId) : base(gl, fileDataID, shaderProgram, parentFileDataId)
         {
-            var wmo = Cache.GetOrLoadWMO(gl, fileDataID, shaderProgram);
+            var wmo = Cache.GetOrLoadWMO(gl, fileDataID, shaderProgram, parentFileDataId);
             EnabledGroups = new bool[wmo.groupBatches.Length];
             EnabledDoodadSets = new bool[wmo.doodadSets.Length];
 

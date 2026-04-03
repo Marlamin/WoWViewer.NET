@@ -76,6 +76,7 @@ namespace WoWViewer.NET.Renderer
     {
         public struct Terrain
         {
+            public uint rootADTFileDataID;
             public uint vao;
             public uint vertexBuffer;
             public uint indiceBuffer;
@@ -83,6 +84,7 @@ namespace WoWViewer.NET.Renderer
             public RenderBatch[] renderBatches;
             public Doodad[] doodads;
             public WorldModelBatch[] worldModelBatches;
+            public uint[] blpFileDataIDs;
             public Vector4 heights;
             public Vector4 weights;
         }
@@ -227,6 +229,7 @@ namespace WoWViewer.NET.Renderer
 
         public struct WorldModel
         {
+            public uint RootWMOFileDataID;
             public WorldModelGroupBatches[] groupBatches;
             public Material[] mats;
             public RenderBatch[] wmoRenderBatch;

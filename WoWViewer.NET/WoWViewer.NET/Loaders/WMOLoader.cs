@@ -30,7 +30,8 @@ namespace WoWViewer.NET.Loaders
 
             var wmoBatch = new WorldModel()
             {
-                groupBatches = new WorldModelGroupBatches[wmo.group.Length]
+                groupBatches = new WorldModelGroupBatches[wmo.group.Length],
+                RootWMOFileDataID = fileDataID
             };
 
             for (var g = 0; g < wmo.group.Length; g++)
@@ -201,33 +202,32 @@ namespace WoWViewer.NET.Loaders
                 }
 
                 if (FileProvider.FileExists(wmo.materials[i].texture1))
-                    wmoBatch.mats[i].textureID1 = (int)Cache.GetOrLoadBLP(gl, wmo.materials[i].texture1);
+                    wmoBatch.mats[i].textureID1 = (int)Cache.GetOrLoadBLP(gl, wmo.materials[i].texture1, fileDataID);
 
                 if (FileProvider.FileExists(wmo.materials[i].texture2))
-                    wmoBatch.mats[i].textureID2 = (int)Cache.GetOrLoadBLP(gl, wmo.materials[i].texture2);
+                    wmoBatch.mats[i].textureID2 = (int)Cache.GetOrLoadBLP(gl, wmo.materials[i].texture2, fileDataID);
 
                 if (FileProvider.FileExists(wmo.materials[i].texture3))
-                    wmoBatch.mats[i].textureID3 = (int)Cache.GetOrLoadBLP(gl, wmo.materials[i].texture3);
+                    wmoBatch.mats[i].textureID3 = (int)Cache.GetOrLoadBLP(gl, wmo.materials[i].texture3, fileDataID);
 
                 if (PixelShader == ShaderEnums.WMOPixelShader.MapObjUnkShader)
                 {
                     if (FileProvider.FileExists(wmo.materials[i].color3))
-                        wmoBatch.mats[i].textureID4 = (int)Cache.GetOrLoadBLP(gl, wmo.materials[i].color3);
+                        wmoBatch.mats[i].textureID4 = (int)Cache.GetOrLoadBLP(gl, wmo.materials[i].color3, fileDataID);
 
                     if (FileProvider.FileExists(wmo.materials[i].flags3))
-                        wmoBatch.mats[i].textureID5 = (int)Cache.GetOrLoadBLP(gl, wmo.materials[i].flags3);
+                        wmoBatch.mats[i].textureID5 = (int)Cache.GetOrLoadBLP(gl, wmo.materials[i].flags3, fileDataID);
 
                     if (FileProvider.FileExists(wmo.materials[i].runtimeData0))
-                        wmoBatch.mats[i].textureID6 = (int)Cache.GetOrLoadBLP(gl, wmo.materials[i].runtimeData0);
+                        wmoBatch.mats[i].textureID6 = (int)Cache.GetOrLoadBLP(gl, wmo.materials[i].runtimeData0, fileDataID);
 
                     if (FileProvider.FileExists(wmo.materials[i].runtimeData1))
-                        wmoBatch.mats[i].textureID7 = (int)Cache.GetOrLoadBLP(gl, wmo.materials[i].runtimeData1);
+                        wmoBatch.mats[i].textureID7 = (int)Cache.GetOrLoadBLP(gl, wmo.materials[i].runtimeData1, fileDataID);
 
                     if (FileProvider.FileExists(wmo.materials[i].runtimeData2))
-                        wmoBatch.mats[i].textureID8 = (int)Cache.GetOrLoadBLP(gl, wmo.materials[i].runtimeData2);
-
+                        wmoBatch.mats[i].textureID8 = (int)Cache.GetOrLoadBLP(gl, wmo.materials[i].runtimeData2, fileDataID);
                     if (FileProvider.FileExists(wmo.materials[i].runtimeData3))
-                        wmoBatch.mats[i].textureID9 = (int)Cache.GetOrLoadBLP(gl, wmo.materials[i].runtimeData3);
+                        wmoBatch.mats[i].textureID9 = (int)Cache.GetOrLoadBLP(gl, wmo.materials[i].runtimeData3, fileDataID);
                 }
             }
 
@@ -397,6 +397,42 @@ namespace WoWViewer.NET.Loaders
 
             wmoBatch.wmoRenderBatch = [.. renderBatches];
             return wmoBatch;
+        }
+
+        public static void UnloadWMO(GL gl, WorldModel wmo)
+        {
+            for (var g = 0; g < wmo.groupBatches.Length; g++)
+            {
+                gl.DeleteBuffer(wmo.groupBatches[g].vertexBuffer);
+                gl.DeleteBuffer(wmo.groupBatches[g].indiceBuffer);
+                gl.DeleteVertexArray(wmo.groupBatches[g].vao);
+            }
+
+            foreach(var mat in wmo.mats)
+            {
+                if (mat.texture1 != -1)
+                    Cache.ReleaseBLP(gl, (uint)mat.texture1, wmo.RootWMOFileDataID);
+                if (mat.texture2 != -1)
+                    Cache.ReleaseBLP(gl, (uint)mat.texture2, wmo.RootWMOFileDataID);
+                if (mat.texture3 != -1)
+                    Cache.ReleaseBLP(gl, (uint)mat.texture3, wmo.RootWMOFileDataID);
+                if (mat.texture4 != -1)
+                    Cache.ReleaseBLP(gl, (uint)mat.texture4, wmo.RootWMOFileDataID);
+                if (mat.texture5 != -1)
+                    Cache.ReleaseBLP(gl, (uint)mat.texture5, wmo.RootWMOFileDataID);
+                if (mat.texture6 != -1)
+                    Cache.ReleaseBLP(gl, (uint)mat.texture6, wmo.RootWMOFileDataID);
+                if (mat.texture7 != -1)
+                    Cache.ReleaseBLP(gl, (uint)mat.texture7, wmo.RootWMOFileDataID);
+                if (mat.texture8 != -1)
+                    Cache.ReleaseBLP(gl, (uint)mat.texture8, wmo.RootWMOFileDataID);
+                if (mat.texture9 != -1)
+                    Cache.ReleaseBLP(gl, (uint)mat.texture9, wmo.RootWMOFileDataID);
+            }
+
+            foreach(var model in wmo.doodads)
+                if (model.filename != null)
+                    Cache.ReleaseM2(gl, model.filedataid, wmo.RootWMOFileDataID);
         }
     }
 }

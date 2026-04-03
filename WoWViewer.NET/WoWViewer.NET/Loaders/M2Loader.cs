@@ -58,8 +58,8 @@ namespace WoWViewer.NET.Loaders
                 throw new Exception("Model does not contain skins: " + fileDataID);
 
             // Textures
-            doodadBatch.mats = new Material[model.textures.Count()];
-            for (var i = 0; i < model.textures.Count(); i++)
+            doodadBatch.mats = new Material[model.textures.Length];
+            for (var i = 0; i < model.textures.Length; i++)
             {
                 uint textureFileDataID = DEFAULT_TEXTURE_ID;
                 doodadBatch.mats[i].flags = model.textures[i].flags;
@@ -86,17 +86,17 @@ namespace WoWViewer.NET.Loaders
                 if (!FileProvider.FileExists(textureFileDataID))
                     textureFileDataID = MISSING_TEXTURE_ID;
 
-                doodadBatch.mats[i].textureID = Cache.GetOrLoadBLP(gl, textureFileDataID);
+                doodadBatch.mats[i].textureID = Cache.GetOrLoadBLP(gl, textureFileDataID, fileDataID);
                 doodadBatch.mats[i].filename = textureFileDataID.ToString();
             }
 
             // Submeshes
-            doodadBatch.submeshes = new Renderer.Structs.Submesh[model.skins[0].submeshes.Count()];
-            for (var i = 0; i < model.skins[0].submeshes.Count(); i++)
+            doodadBatch.submeshes = new Submesh[model.skins[0].submeshes.Length];
+            for (var i = 0; i < model.skins[0].submeshes.Length; i++)
             {
                 doodadBatch.submeshes[i].firstFace = model.skins[0].submeshes[i].startTriangle;
                 doodadBatch.submeshes[i].numFaces = model.skins[0].submeshes[i].nTriangles;
-                for (var tu = 0; tu < model.skins[0].textureunit.Count(); tu++)
+                for (var tu = 0; tu < model.skins[0].textureunit.Length; tu++)
                 {
                     if (model.skins[0].textureunit[tu].submeshIndex == i)
                     {
@@ -127,7 +127,7 @@ namespace WoWViewer.NET.Loaders
                         if (!FileProvider.FileExists(textureFileDataID))
                             textureFileDataID = MISSING_TEXTURE_ID;
 
-                        doodadBatch.submeshes[i].material = (uint)Cache.GetOrLoadBLP(gl, textureFileDataID);
+                        doodadBatch.submeshes[i].material = (uint)Cache.GetOrLoadBLP(gl, textureFileDataID, fileDataID);
                     }
                 }
             }
@@ -148,7 +148,7 @@ namespace WoWViewer.NET.Loaders
             gl.BindBuffer(BufferTargetARB.ElementArrayBuffer, doodadBatch.indiceBuffer);
 
             var modelindicelist = new List<uint>();
-            for (var i = 0; i < model.skins[0].triangles.Count(); i++)
+            for (var i = 0; i < model.skins[0].triangles.Length; i++)
             {
                 modelindicelist.Add(model.skins[0].triangles[i].pt1);
                 modelindicelist.Add(model.skins[0].triangles[i].pt2);
@@ -163,9 +163,9 @@ namespace WoWViewer.NET.Loaders
             fixed (uint* buf = doodadBatch.indices)
                 gl.BufferData(BufferTargetARB.ElementArrayBuffer, (nuint)(doodadBatch.indices.Length * sizeof(uint)), buf, GLEnum.StaticDraw);
 
-            var modelvertices = new M2Vertex[model.vertices.Count()];
+            var modelvertices = new M2Vertex[model.vertices.Length];
 
-            for (var i = 0; i < model.vertices.Count(); i++)
+            for (var i = 0; i < model.vertices.Length; i++)
             {
                 modelvertices[i].Position = new Vector3(model.vertices[i].position.X, model.vertices[i].position.Y, model.vertices[i].position.Z);
                 modelvertices[i].Normal = new Vector3(model.vertices[i].normal.X, model.vertices[i].normal.Y, model.vertices[i].normal.Z);

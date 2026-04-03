@@ -1,6 +1,7 @@
 ﻿using Silk.NET.OpenGL;
 using WoWViewer.NET.Loaders;
 using static WoWViewer.NET.Renderer.Structs;
+using static WoWViewer.NET.Structs;
 
 namespace WoWViewer.NET.Renderer
 {
@@ -11,8 +12,19 @@ namespace WoWViewer.NET.Renderer
         private static Dictionary<uint, WorldModel> WMOCache = new();
         private static Dictionary<uint, DoodadBatch> M2Cache = new();
 
-        public static DoodadBatch GetOrLoadM2(GL gl, uint fileDataId, uint shaderProgram)
+        private static Dictionary<uint, List<uint>> BLPUsers = [];
+        private static Dictionary<string, List<uint>> ADTUsers = [];
+        private static Dictionary<uint, List<uint>> WMOUsers = [];
+        private static Dictionary<uint, List<uint>> M2Users = [];
+
+        #region M2
+        public static DoodadBatch GetOrLoadM2(GL gl, uint fileDataId, uint shaderProgram, uint parent)
         {
+            if (M2Users.TryGetValue(fileDataId, out var users))
+                users.Add(parent);
+            else
+                M2Users.Add(fileDataId, [parent]);
+
             if (M2Cache.TryGetValue(fileDataId, out DoodadBatch value))
                 return value;
 
@@ -21,8 +33,36 @@ namespace WoWViewer.NET.Renderer
             return M2Cache[fileDataId];
         }
 
-        public static WorldModel GetOrLoadWMO(GL gl, uint fileDataId, uint shaderProgram)
+        public static void ReleaseM2(GL gl, uint fileDataId, uint parent)
         {
+            if (M2Users.TryGetValue(fileDataId, out var users))
+            {
+                users.Remove(parent);
+                if (users.Count == 0)
+                {
+                    M2Users.Remove(fileDataId);
+                    if (M2Cache.TryGetValue(fileDataId, out var model))
+                    {
+                        // TODO: Dispose model GPU resources (VAO, VBOs) and release BLP textures
+                        M2Cache.Remove(fileDataId);
+                    }
+                }
+                else
+                {
+                    M2Users[fileDataId] = users;
+                }
+            }
+        }
+        #endregion
+
+        #region WMO
+        public static WorldModel GetOrLoadWMO(GL gl, uint fileDataId, uint shaderProgram, uint parent)
+        {
+            if (WMOUsers.TryGetValue(fileDataId, out var users))
+                users.Add(parent);
+            else
+                WMOUsers.Add(fileDataId, [parent]);
+
             if (WMOCache.TryGetValue(fileDataId, out WorldModel value))
                 return value;
 
@@ -31,18 +71,77 @@ namespace WoWViewer.NET.Renderer
             return WMOCache[fileDataId];
         }
 
-        //public static Terrain GetOrLoadADT(GL gl, string fileName, uint shaderProgram)
-        //{
-        //    if (ADTCache.ContainsKey(fileName))
-        //        return ADTCache[fileName];
-
-        //    ADTCache.Add(fileName, ADTLoader.LoadADT(gl, fileName, shaderProgram));
-
-        //    return ADTCache[fileName];
-        //}
-
-        public static uint GetOrLoadBLP(GL gl, uint fileDataId)
+        public static void ReleaseWMO(GL gl, uint fileDataId, uint parent)
         {
+            if (WMOUsers.TryGetValue(fileDataId, out var users))
+            {
+                users.Remove(parent);
+                if (users.Count == 0)
+                {
+                    WMOUsers.Remove(fileDataId);
+                    if (WMOCache.TryGetValue(fileDataId, out var wmo))
+                    {
+                        WMOCache.Remove(fileDataId);
+                        WMOLoader.UnloadWMO(gl, wmo);
+                    }
+                }
+                else
+                {
+                    WMOUsers[fileDataId] = users;
+                }
+            }
+        }
+        #endregion
+
+        #region ADT
+        public static Terrain GetOrLoadADT(GL gl, MapTile mapTile, uint shaderProgram, uint parent, bool loadModels = false)
+        {
+            var key = (mapTile.wdtFileDataID, mapTile.tileX, mapTile.tileY).ToString();
+
+            if (ADTUsers.TryGetValue(key, out var users))
+                users.Add(parent);
+            else
+                ADTUsers.Add(key, [parent]);
+
+            if (ADTCache.TryGetValue(key, out Terrain value))
+                return value;
+
+            ADTCache.Add(key, ADTLoader.LoadADT(gl, mapTile, shaderProgram, loadModels));
+
+            return ADTCache[key];
+        }
+
+        public static void ReleaseADT(GL gl, MapTile mapTile, uint parent)
+        {
+            var key = (mapTile.wdtFileDataID, mapTile.tileX, mapTile.tileY).ToString();
+            if (ADTUsers.TryGetValue(key, out var users))
+            {
+                users.Remove(parent);
+                if (users.Count == 0)
+                {
+                    ADTUsers.Remove(key);
+                    if (ADTCache.TryGetValue(key, out var terrain))
+                    {
+                        ADTLoader.UnloadTerrain(terrain, gl);
+                        ADTCache.Remove(key);
+                    }
+                }
+                else
+                {
+                    ADTUsers[key] = users;
+                }
+            }
+        }
+        #endregion
+
+        #region BLP
+        public static uint GetOrLoadBLP(GL gl, uint fileDataId, uint parent)
+        {
+            if (BLPUsers.TryGetValue(fileDataId, out var users))
+                users.Add(parent);
+            else
+                BLPUsers.Add(fileDataId, [parent]);
+
             if (BLPCache.TryGetValue(fileDataId, out uint value))
                 return value;
 
@@ -50,5 +149,29 @@ namespace WoWViewer.NET.Renderer
 
             return BLPCache[fileDataId];
         }
+
+        public static void ReleaseBLP(GL gl, uint fileDataId, uint parent)
+        {
+            if (BLPUsers.TryGetValue(fileDataId, out var users))
+            {
+                users.Remove(parent);
+
+                if (users.Count == 0)
+                {
+                    BLPUsers.Remove(fileDataId);
+                    if (BLPCache.TryGetValue(fileDataId, out var textureId))
+                    {
+                        Console.WriteLine("Deleting BLP texture " + textureId);
+                        gl.DeleteTexture(textureId);
+                        BLPCache.Remove(fileDataId);
+                    }
+                }
+                else
+                {
+                    BLPUsers[fileDataId] = users;
+                }
+            }
+        }
+        #endregion
     }
 }
