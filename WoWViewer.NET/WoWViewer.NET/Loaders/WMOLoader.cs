@@ -1,5 +1,4 @@
 ﻿using Silk.NET.OpenGL;
-using System.Diagnostics;
 using System.Numerics;
 using WoWFormatLib.FileProviders;
 using WoWFormatLib.FileReaders;
@@ -24,41 +23,30 @@ namespace WoWViewer.NET.Loaders
 
         public static unsafe WorldModel LoadWMO(GL gl, uint fileDataID, uint shaderProgram, string fileName = "")
         {
-            Console.WriteLine("Loading WMO " + fileDataID);
             WMO wmo = new WMOReader().LoadWMO(fileDataID, 0, fileName);
 
             if (wmo.group.Length == 0)
-            {
-                Console.WriteLine("WMO has no groups: ", fileName);
-                throw new Exception("Broken WMO! Report to developer (mail marlamin@marlamin.com) with this filename: " + fileName);
-            }
+                throw new Exception("Broken WMO! No groups");
 
-            var wmoBatch = new Renderer.Structs.WorldModel()
+            var wmoBatch = new WorldModel()
             {
-                groupBatches = new Renderer.Structs.WorldModelGroupBatches[wmo.group.Length]
+                groupBatches = new WorldModelGroupBatches[wmo.group.Length]
             };
 
             for (var g = 0; g < wmo.group.Length; g++)
             {
-                string groupName = null;
+                string groupName = "";
                 for (var i = 0; i < wmo.groupNames.Length; i++)
                     if (wmo.group[g].mogp.nameOffset == wmo.groupNames[i].offset)
                         groupName = wmo.groupNames[i].name.Replace(" ", "_");
 
                 if (groupName == "antiportal")
-                {
-                    Console.WriteLine("Skipping group " + groupName + " because antiportal");
                     continue;
-                }
 
                 if (wmo.group[g].mogp.vertices == null)
-                {
-                    Console.WriteLine("Skipping group " + groupName + " because it has no vertices");
                     continue;
-                }
 
                 wmoBatch.groupBatches[g].groupName = groupName;
-
                 wmoBatch.groupBatches[g].vao = gl.GenVertexArray();
                 wmoBatch.groupBatches[g].vertexBuffer = gl.GenBuffer();
                 wmoBatch.groupBatches[g].indiceBuffer = gl.GenBuffer();
@@ -94,31 +82,19 @@ namespace WoWViewer.NET.Loaders
                         wmovertices[i].TexCoord4 = new Vector2(wmo.group[g].mogp.textureCoords[3][i].X, wmo.group[g].mogp.textureCoords[3][i].Y);
 
                     if (wmo.group[g].mogp.colors != null)
-                    {
                         wmovertices[i].Color = new Vector4(wmo.group[g].mogp.colors[i].X, wmo.group[g].mogp.colors[i].Y, wmo.group[g].mogp.colors[i].Z, wmo.group[g].mogp.colors[i].W);
-                    }
                     else
-                    {
                         wmovertices[i].Color = new Vector4(0.0f, 0.0f, 0.0f, 0.0f);
-                    }
 
                     if (wmo.group[g].mogp.colors2 != null)
-                    {
                         wmovertices[i].Color2 = new Vector4(wmo.group[g].mogp.colors2[i].X, wmo.group[g].mogp.colors2[i].Y, wmo.group[g].mogp.colors2[i].Z, wmo.group[g].mogp.colors2[i].W);
-                    }
                     else
-                    {
                         wmovertices[i].Color2 = new Vector4(0.0f, 0.0f, 0.0f, 0.0f);
-                    }
 
                     if (wmo.group[g].mogp.colors3 != null)
-                    {
                         wmovertices[i].Color3 = new Vector4(wmo.group[g].mogp.colors3[i].X, wmo.group[g].mogp.colors3[i].Y, wmo.group[g].mogp.colors3[i].Z, wmo.group[g].mogp.colors3[i].W);
-                    }
                     else
-                    {
                         wmovertices[i].Color3 = new Vector4(0.0f, 0.0f, 0.0f, 0.0f);
-                    }
                 }
 
                 //Push to buffer
@@ -168,7 +144,7 @@ namespace WoWViewer.NET.Loaders
                     gl.BufferData(BufferTargetARB.ElementArrayBuffer, (nuint)(wmo.group[g].mogp.indices.Length * sizeof(ushort)), buf, BufferUsageARB.StaticDraw);
             }
 
-            wmoBatch.mats = new Renderer.Structs.Material[wmo.materials.Length];
+            wmoBatch.mats = new Material[wmo.materials.Length];
             for (var i = 0; i < wmo.materials.Length; i++)
             {
                 wmoBatch.mats[i].texture1 = (int)wmo.materials[i].texture1;
@@ -194,13 +170,13 @@ namespace WoWViewer.NET.Loaders
                 var (VertexShader, PixelShader) = ShaderEnums.WMOShaders[(int)wmo.materials[i].shader];
                 if (PixelShader == ShaderEnums.WMOPixelShader.MapObjParallax)
                 {
-                    if((int)wmo.materials[i].color3 != 0)
+                    if ((int)wmo.materials[i].color3 != 0)
                         wmoBatch.mats[i].texture4 = (int)wmo.materials[i].color3;
 
-                    if((int)wmo.materials[i].flags3 != 0)
+                    if ((int)wmo.materials[i].flags3 != 0)
                         wmoBatch.mats[i].texture5 = (int)wmo.materials[i].flags3;
 
-                    if((int)wmo.materials[i].runtimeData0 != 0)
+                    if ((int)wmo.materials[i].runtimeData0 != 0)
                         wmoBatch.mats[i].texture6 = (int)wmo.materials[i].runtimeData0;
                 }
                 else if (PixelShader == ShaderEnums.WMOPixelShader.MapObjUnkShader)
@@ -347,7 +323,6 @@ namespace WoWViewer.NET.Loaders
                         if (wmo.materials[matID].runtimeData3 == wmoBatch.mats[ti].texture9)
                             renderBatch.materialID[8] = (int)wmoBatch.mats[ti].textureID9;
                     }
-
 
                     renderBatch.blendType = wmo.materials[matID].blendMode;
                     renderBatch.groupID = (uint)g;
