@@ -54,7 +54,7 @@ namespace WoWViewer.NET
 
         private static Queue<MapTile> tilesToLoad = new();
         private static int totalTilesToLoad = 0;
-        private static HashSet<uint> usedUUIDs = new();
+        private static Dictionary<uint, uint> uuidUsers = new();
         private static HashSet<MapTile> loadedTiles = new();
 
         private static uint CurrentWDTFileDataID = 775971;
@@ -278,7 +278,7 @@ namespace WoWViewer.NET
 
                     foreach (var worldModel in adt.worldModelBatches)
                     {
-                        if (usedUUIDs.Contains(worldModel.uniqueID))
+                        if (uuidUsers.ContainsKey(worldModel.uniqueID))
                             continue;
 
                         var worldModelContainer = new WMOContainer(gl, worldModel.fileDataID, wmoShaderProgram, adt.rootADTFileDataID)
@@ -290,7 +290,11 @@ namespace WoWViewer.NET
                         };
 
                         sceneObjects.Add(worldModelContainer);
-                        usedUUIDs.Add(worldModel.uniqueID);
+
+                        if(uuidUsers.TryGetValue(worldModel.uniqueID, out var count))
+                            uuidUsers[worldModel.uniqueID] = count + 1;
+                        else
+                            uuidUsers[worldModel.uniqueID] = 1;
                     }
 
                     foreach (var doodad in adt.doodads)
@@ -816,9 +820,20 @@ namespace WoWViewer.NET
                             List<WMOContainer> wmosToRemove = sceneObjects.Where(x => x is WMOContainer wmo && wmo.ParentFileDataId == adtToRemove.Terrain.rootADTFileDataID).Select(x => (WMOContainer)x).ToList();
                             foreach (var wmo in wmosToRemove)
                             {
-                                sceneObjects.Remove(wmo);
-                                usedUUIDs.Remove(wmo.UniqueID);
-                                Cache.ReleaseWMO(gl, wmo.FileDataId, wmo.ParentFileDataId);
+                                if (uuidUsers.TryGetValue(wmo.UniqueID, out var count))
+                                {
+                                    if (count > 1)
+                                    {
+                                        uuidUsers[wmo.UniqueID] = count - 1;
+                                    }
+                                    else
+                                    {
+                                        sceneObjects.Remove(wmo);
+                                        Cache.ReleaseWMO(gl, wmo.FileDataId, wmo.ParentFileDataId);
+                                        uuidUsers.Remove(wmo.UniqueID);
+                                    }
+                                }
+
                             }
 
                             List<M2Container> m2sToRemove = sceneObjects.Where(x => x is M2Container m2 && m2.ParentFileDataId == adtToRemove.Terrain.rootADTFileDataID).Select(x => (M2Container)x).ToList();
