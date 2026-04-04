@@ -84,19 +84,10 @@ namespace WoWViewer.NET.Loaders
 
             var textureId = gl.GenTexture();
 
-            var pixelList = new byte[64 * 64 * 4];
-            for (var x = 0; x < 64; x++)
-            {
-                for (var y = 0; y < 64; y++)
-                {
-                    pixelList[(x * 64) + y] = values[x * 64 + y];
-                }
-            }
-
             gl.BindTexture(TextureTarget.Texture2D, textureId);
 
-            fixed (byte* buf = pixelList)
-                gl.TexImage2D(TextureTarget.Texture2D, 0, InternalFormat.R8, 64, 64, 0, PixelFormat.Red, PixelType.UnsignedByte, buf);
+            fixed (byte* buf = values)
+                gl.TexImage2D(TextureTarget.Texture2D, 0, InternalFormat.Rgba, 64, 64, 0, PixelFormat.Rgba, PixelType.UnsignedByte, buf);
 
             gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Linear);
             gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Linear);

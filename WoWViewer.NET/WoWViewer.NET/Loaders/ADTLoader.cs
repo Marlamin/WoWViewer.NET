@@ -190,16 +190,19 @@ namespace WoWViewer.NET.Loaders
                 batch.numFaces = (uint)(indicelist.Count) - batch.firstFace;
 
                 var layerMaterials = new List<int>(8) { -1, -1, -1, -1, -1, -1, -1, -1 };
-                var alphalayermats = new List<int>(8) { -1, -1, -1, -1, -1, -1, -1, -1 };
+                var alphalayermats = new List<int>(2) { -1, -1 };
                 var layerheights = new List<int>(8) { -1, -1, -1, -1, -1, -1, -1, -1 };
 
                 var layerscales = new List<float>(8) { 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f };
                 var heightScales = new List<float>(8) { 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f };
                 var heightOffsets = new List<float>(8) { 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f };
-                for (var li = 0; li < adt.chunks[c].layers.Length; li++)
+
+                var alphaLayers = new Dictionary<int, byte[]>();
+
+                for (byte li = 0; li < adt.chunks[c].layers.Length; li++)
                 {
                     if (adt.chunks[c].alphaLayer != null)
-                        alphalayermats[li] = (int)BLPLoader.GenerateAlphaTexture(gl, adt.chunks[c].alphaLayer[li].layer);
+                        alphaLayers.Add(li, adt.chunks[c].alphaLayer[li].layer);
 
                     Material curMat;
 
@@ -221,6 +224,36 @@ namespace WoWViewer.NET.Loaders
                     heightOffsets[li] = curMat.heightOffset;
                 }
 
+                for (int li = 0; li < 2; li++)
+                {
+                    if (!alphaLayers.TryGetValue(0 + (li * 4), out byte[] alphaLayer0))
+                        alphaLayer0 = new byte[4096];
+
+                    if (!alphaLayers.TryGetValue(1 + (li * 4), out byte[] alphaLayer1))
+                        alphaLayer1 = new byte[4096];
+
+                    if (!alphaLayers.TryGetValue(2 + (li * 4), out byte[] alphaLayer2))
+                        alphaLayer2 = new byte[4096];
+
+                    if (!alphaLayers.TryGetValue(3 + (li * 4), out byte[] alphaLayer3))
+                        alphaLayer3 = new byte[4096];
+
+                    var alphaData = new byte[64 * 64 * 4];
+                    for(int x = 0; x < 64; x++)
+                    {
+                        for(int y = 0; y < 64; y++)
+                        {
+                            var idx = (y * 64 + x) * 4;
+                            alphaData[idx] = alphaLayer0[y * 64 + x];
+                            alphaData[idx + 1] = alphaLayer1[y * 64 + x];
+                            alphaData[idx + 2] = alphaLayer2[y * 64 + x];
+                            alphaData[idx + 3] = alphaLayer3[y * 64 + x];
+                        }
+                    }
+
+                    alphalayermats[li] = (int)BLPLoader.GenerateAlphaTexture(gl, alphaData);
+                }
+
                 batch.heightScales = [.. heightScales];
                 batch.heightOffsets = [.. heightOffsets];
 
@@ -236,9 +269,9 @@ namespace WoWViewer.NET.Loaders
                 fixed (Vertex* buf = vertices)
                     gl.BufferData(BufferTargetARB.ArrayBuffer, (nuint)vertices.Length * 12 * sizeof(float), buf, GLEnum.StaticDraw);
 
-                //var normalAttrib = GL.GetAttribLocation(shaderProgram, "normal");
-                //GL.EnableVertexAttribArray(normalAttrib);
-                //GL.VertexAttribPointer(normalAttrib, 3, VertexAttribPointerType.Float, false, sizeof(float) * 11, sizeof(float) * 0);
+                var normalAttrib = gl.GetAttribLocation(shaderProgram, "normal");
+                gl.EnableVertexAttribArray((uint)normalAttrib);
+                gl.VertexAttribPointer((uint)normalAttrib, 3, GLEnum.Float, false, sizeof(float) * 12, (void*)(sizeof(float) * 0));
 
                 var colorAttrib = gl.GetAttribLocation(shaderProgram, "color");
                 gl.EnableVertexAttribArray((uint)colorAttrib);

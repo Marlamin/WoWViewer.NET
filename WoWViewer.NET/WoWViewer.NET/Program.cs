@@ -503,8 +503,8 @@ namespace WoWViewer.NET
             for (int i = 0; i < 8; i++)
                 layerScaleUniforms[i] = gl.GetUniformLocation(adtShaderProgram, $"layerScales[{i}]");
 
-            var alphaLayerUniforms = new int[8];
-            for (int i = 0; i < 8; i++)
+            var alphaLayerUniforms = new int[2];
+            for (int i = 0; i < 2; i++)
                 alphaLayerUniforms[i] = gl.GetUniformLocation(adtShaderProgram, $"alphaLayers[{i}]");
 
             var diffuseLayerUniforms = new int[8];
@@ -673,9 +673,9 @@ namespace WoWViewer.NET
 
                     for (int i = 0; i < adt.Terrain.renderBatches.Length; i++)
                     {
-                        for (int j = 1; j < 8; j++)
+                        for (int j = 0; j < 2; j++)
                         {
-                            gl.Uniform1(alphaLayerUniforms[j - 1], j - 1);
+                            gl.Uniform1(alphaLayerUniforms[j], j);
                             gl.ActiveTexture(TextureUnit.Texture0 + j);
                             gl.BindTexture(TextureTarget.Texture2D, (adt.Terrain.renderBatches[i].alphaMaterialID[j]) == -1 ? defaultTextureID : (uint)adt.Terrain.renderBatches[i].alphaMaterialID[j]);
                         }

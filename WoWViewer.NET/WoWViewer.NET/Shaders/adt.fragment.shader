@@ -12,7 +12,7 @@ uniform float layerScales[8];
 
 uniform sampler2D diffuseLayers[8];
 uniform sampler2D heightLayers[8];
-uniform sampler2D alphaLayers[8];
+uniform sampler2D alphaLayers[2];
 
 // Based on https://github.com/Kruithne/wow.export/blob/main/src/shaders/adt.fragment.shader but without the sampler2darrays because I'm stoopid
 void main()
@@ -21,13 +21,13 @@ void main()
 
 	float alphas[8];
 	alphas[0] = 1.0;
-	alphas[1] = texture(alphaLayers[1], mod(TexCoord, 1.0)).r;
-	alphas[2] = texture(alphaLayers[2], mod(TexCoord, 1.0)).r;
-	alphas[3] = texture(alphaLayers[3], mod(TexCoord, 1.0)).r;
-	alphas[4] = texture(alphaLayers[4], mod(TexCoord, 1.0)).r;
-	alphas[5] = texture(alphaLayers[5], mod(TexCoord, 1.0)).r;
-	alphas[6] = texture(alphaLayers[6], mod(TexCoord, 1.0)).r;
-	alphas[7] = texture(alphaLayers[7], mod(TexCoord, 1.0)).r;
+	alphas[1] = texture(alphaLayers[0], mod(TexCoord, 1.0)).g;
+	alphas[2] = texture(alphaLayers[0], mod(TexCoord, 1.0)).b;
+	alphas[3] = texture(alphaLayers[0], mod(TexCoord, 1.0)).a;
+	alphas[4] = texture(alphaLayers[1], mod(TexCoord, 1.0)).r;
+	alphas[5] = texture(alphaLayers[1], mod(TexCoord, 1.0)).g;
+	alphas[6] = texture(alphaLayers[1], mod(TexCoord, 1.0)).b;
+	alphas[7] = texture(alphaLayers[1], mod(TexCoord, 1.0)).a;
 
 	vec3 alpha_sum = vec3(
 		alphas[1] + alphas[2] + alphas[3] + alphas[4] + alphas[5] + alphas[6] + alphas[7]
