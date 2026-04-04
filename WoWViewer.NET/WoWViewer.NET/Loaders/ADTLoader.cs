@@ -226,17 +226,30 @@ namespace WoWViewer.NET.Loaders
 
                 for (int li = 0; li < 2; li++)
                 {
+                    var hasAlphas = false;
+
                     if (!alphaLayers.TryGetValue(0 + (li * 4), out byte[] alphaLayer0))
                         alphaLayer0 = new byte[4096];
+                    else
+                        hasAlphas = true;
 
                     if (!alphaLayers.TryGetValue(1 + (li * 4), out byte[] alphaLayer1))
                         alphaLayer1 = new byte[4096];
+                    else
+                        hasAlphas = true;
 
                     if (!alphaLayers.TryGetValue(2 + (li * 4), out byte[] alphaLayer2))
                         alphaLayer2 = new byte[4096];
+                    else
+                        hasAlphas= true;
 
                     if (!alphaLayers.TryGetValue(3 + (li * 4), out byte[] alphaLayer3))
                         alphaLayer3 = new byte[4096];
+                    else
+                        hasAlphas = true;
+
+                    if (!hasAlphas)
+                        continue;
 
                     var alphaData = new byte[64 * 64 * 4];
                     for(int x = 0; x < 64; x++)
