@@ -48,7 +48,8 @@ namespace WoWViewer.NET.Loaders
                 {
                     min = new Vector3(model.boundingbox[0].X, model.boundingbox[0].Y, model.boundingbox[0].Z),
                     max = new Vector3(model.boundingbox[1].X, model.boundingbox[1].Y, model.boundingbox[1].Z)
-                }
+                },
+                boundingRadius = model.boundingradius
             };
 
             if (model.textures == null)

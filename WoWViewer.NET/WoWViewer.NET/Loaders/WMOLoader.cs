@@ -31,7 +31,9 @@ namespace WoWViewer.NET.Loaders
             var wmoBatch = new WorldModel()
             {
                 groupBatches = new WorldModelGroupBatches[wmo.group.Length],
-                RootWMOFileDataID = fileDataID
+                RootWMOFileDataID = fileDataID,
+                boundingBox = [wmo.header.boundingBox1, wmo.header.boundingBox2],
+                boundingRadius = CalculateBoundingRadius(wmo.header.boundingBox1, wmo.header.boundingBox2)
             };
 
             for (var g = 0; g < wmo.group.Length; g++)
@@ -397,6 +399,12 @@ namespace WoWViewer.NET.Loaders
 
             wmoBatch.wmoRenderBatch = [.. renderBatches];
             return wmoBatch;
+        }
+
+        private static float CalculateBoundingRadius(Vector3 min, Vector3 max)
+        {
+            var center = (min + max) * 0.5f;
+            return Vector3.Distance(center, max);
         }
 
         public static void UnloadWMO(GL gl, WorldModel wmo)

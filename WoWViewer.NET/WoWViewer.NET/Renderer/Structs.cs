@@ -185,6 +185,7 @@ namespace WoWViewer.NET.Renderer
             public uint indiceBuffer;
             public uint[] indices;
             public BoundingBox boundingBox;
+            public float boundingRadius;
             public Submesh[] submeshes;
             public Material[] mats;
         }
@@ -233,6 +234,8 @@ namespace WoWViewer.NET.Renderer
             public RenderBatch[] wmoRenderBatch;
             public WMODoodad[] doodads;
             public string[] doodadSets;
+            public Vector3[] boundingBox;
+            public float boundingRadius;
         }
 
         public struct WorldModelGroupBatches
