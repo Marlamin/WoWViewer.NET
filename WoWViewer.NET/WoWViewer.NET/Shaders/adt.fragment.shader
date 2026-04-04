@@ -20,14 +20,17 @@ void main()
 	vec4 in_vertexColor = VColor;
 
 	float alphas[8];
+	vec4 alpha0 = texture(alphaLayers[0], mod(TexCoord, 1.0));
+	vec4 alpha1 = texture(alphaLayers[1], mod(TexCoord, 1.0));
+
 	alphas[0] = 1.0;
-	alphas[1] = texture(alphaLayers[0], mod(TexCoord, 1.0)).g;
-	alphas[2] = texture(alphaLayers[0], mod(TexCoord, 1.0)).b;
-	alphas[3] = texture(alphaLayers[0], mod(TexCoord, 1.0)).a;
-	alphas[4] = texture(alphaLayers[1], mod(TexCoord, 1.0)).r;
-	alphas[5] = texture(alphaLayers[1], mod(TexCoord, 1.0)).g;
-	alphas[6] = texture(alphaLayers[1], mod(TexCoord, 1.0)).b;
-	alphas[7] = texture(alphaLayers[1], mod(TexCoord, 1.0)).a;
+	alphas[1] = alpha0.g;
+	alphas[2] = alpha0.b;
+	alphas[3] = alpha0.a;
+	alphas[4] = alpha1.r;
+	alphas[5] = alpha1.g;
+	alphas[6] = alpha1.b;
+	alphas[7] = alpha1.a;
 
 	vec3 alpha_sum = vec3(
 		alphas[1] + alphas[2] + alphas[3] + alphas[4] + alphas[5] + alphas[6] + alphas[7]
