@@ -26,7 +26,7 @@ namespace WoWViewer.NET
         private static uint wmoShaderProgram;
         private static uint m2ShaderProgram;
 
-        private static float movementSpeed = 50f;
+        private static float movementSpeed = 150f;
         private static bool isMouseDragging = false;
         private static bool hasFocus = true;
 

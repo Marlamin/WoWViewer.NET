@@ -87,7 +87,6 @@ namespace WoWViewer.NET.Loaders
                     textureFileDataID = MISSING_TEXTURE_ID;
 
                 doodadBatch.mats[i].textureID = Cache.GetOrLoadBLP(gl, textureFileDataID, fileDataID);
-                doodadBatch.mats[i].filename = textureFileDataID.ToString();
             }
 
             // Submeshes

@@ -119,9 +119,7 @@ namespace WoWViewer.NET.Renderer
 
         public struct Material
         {
-            public string filename;
-
-            // M2
+            // M2/ADT
             public uint textureID;
 
             // WMO

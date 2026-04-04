@@ -46,14 +46,13 @@ namespace WoWViewer.NET.Loaders
             result.vertexBuffer = gl.GenBuffer();
             result.indiceBuffer = gl.GenBuffer();
 
-            var materials = new List<Material>();
+            var materials = new Dictionary<uint, Material>();
 
             if (adt.textures.filenames == null)
             {
                 for (var ti = 0; ti < adt.diffuseTextureFileDataIDs.Length; ti++)
                 {
                     var material = new Material();
-                    material.filename = adt.diffuseTextureFileDataIDs[ti].ToString();
                     material.textureID = Cache.GetOrLoadBLP(gl, adt.diffuseTextureFileDataIDs[ti], mapTile.wdtFileDataID);
                     usedBLPFileDataIDs.Add(material.textureID);
 
@@ -89,51 +88,11 @@ namespace WoWViewer.NET.Loaders
                         material.heightOffset = 1.0f;
                         material.scale = 1.0f;
                     }
-                    materials.Add(material);
+                    materials.Add(adt.diffuseTextureFileDataIDs[ti], material);
                 }
             }
             else
             {
-                //for (var ti = 0; ti < adt.textures.filenames.Length; ti++)
-                //{
-                //    var material = new Material();
-                //    material.filename = adt.textures.filenames[ti];
-                //    material.textureID = BLPLoader.LoadTexture(gl, adt.textures.filenames[ti]);
-
-                //    if (adt.texParams != null && adt.texParams.Length >= ti)
-                //    {
-                //        material.scale = (float)Math.Pow(2, (adt.texParams[ti].flags & 0xF0) >> 4);
-                //        if (adt.texParams[ti].height != 0.0 || adt.texParams[ti].offset != 1.0)
-                //        {
-                //            material.heightScale = adt.texParams[ti].height;
-                //            material.heightOffset = adt.texParams[ti].offset;
-
-                //            var heightName = adt.textures.filenames[ti].Replace(".blp", "_h.blp");
-                //            if (!FileProvider.FileExists(heightName))
-                //            {
-                //                Console.WriteLine("Height texture: " + heightName + " does not exist! Falling back to original texture (hack)..");
-                //                material.heightTexture = BLPLoader.LoadTexture(gl, adt.textures.filenames[ti]);
-                //            }
-                //            else
-                //            {
-                //                material.heightTexture = BLPLoader.LoadTexture(gl, heightName);
-                //            }
-                //        }
-                //        else
-                //        {
-                //            material.heightScale = 0.0f;
-                //            material.heightOffset = 1.0f;
-                //        }
-                //    }
-                //    else
-                //    {
-                //        material.heightScale = 0.0f;
-                //        material.heightOffset = 1.0f;
-                //        material.scale = 1.0f;
-                //    }
-                //    materials.Add(material);
-                //}
-
                 throw new Exception("Filename-based loading yeeted");
             }
 
@@ -143,6 +102,11 @@ namespace WoWViewer.NET.Loaders
             var initialChunkX = adt.chunks[0].header.position.X;
 
             var renderBatches = new List<RenderBatch>();
+
+            var normalAttrib = gl.GetAttribLocation(shaderProgram, "normal");
+            var colorAttrib = gl.GetAttribLocation(shaderProgram, "color");
+            var texCoordAttrib = gl.GetAttribLocation(shaderProgram, "texCoord");
+            var posAttrib = gl.GetAttribLocation(shaderProgram, "position");
 
             for (uint c = 0; c < adt.chunks.Length; c++)
             {
@@ -187,6 +151,7 @@ namespace WoWViewer.NET.Loaders
                     indicelist.AddRange(new int[] { off + j + 9, off + j + 8, off + j });
                     if ((j + 1) % (9 + 8) == 0) j += 9;
                 }
+
                 batch.numFaces = (uint)(indicelist.Count) - batch.firstFace;
 
                 var layerMaterials = new List<int>(8) { -1, -1, -1, -1, -1, -1, -1, -1 };
@@ -214,7 +179,7 @@ namespace WoWViewer.NET.Loaders
                     {
                         layerMaterials[li] = (int)Cache.GetOrLoadBLP(gl, adt.diffuseTextureFileDataIDs[adt.chunks[c].layers[li].textureId], rootADTFileDataID);
                         usedBLPFileDataIDs.Add(adt.diffuseTextureFileDataIDs[adt.chunks[c].layers[li].textureId]);
-                        curMat = materials.Where(material => material.filename == adt.diffuseTextureFileDataIDs[adt.chunks[c].layers[li].textureId].ToString()).Single();
+                        curMat = materials[adt.diffuseTextureFileDataIDs[adt.chunks[c].layers[li].textureId]];
                     }
 
                     layerheights[li] = (int)curMat.heightTexture;
@@ -228,22 +193,22 @@ namespace WoWViewer.NET.Loaders
                 {
                     var hasAlphas = false;
 
-                    if (!alphaLayers.TryGetValue(0 + (li * 4), out byte[] alphaLayer0))
+                    if (!alphaLayers.TryGetValue(0 + (li * 4), out var alphaLayer0))
                         alphaLayer0 = new byte[4096];
                     else
                         hasAlphas = true;
 
-                    if (!alphaLayers.TryGetValue(1 + (li * 4), out byte[] alphaLayer1))
+                    if (!alphaLayers.TryGetValue(1 + (li * 4), out var alphaLayer1))
                         alphaLayer1 = new byte[4096];
                     else
                         hasAlphas = true;
 
-                    if (!alphaLayers.TryGetValue(2 + (li * 4), out byte[] alphaLayer2))
+                    if (!alphaLayers.TryGetValue(2 + (li * 4), out var alphaLayer2))
                         alphaLayer2 = new byte[4096];
                     else
                         hasAlphas= true;
 
-                    if (!alphaLayers.TryGetValue(3 + (li * 4), out byte[] alphaLayer3))
+                    if (!alphaLayers.TryGetValue(3 + (li * 4), out var alphaLayer3))
                         alphaLayer3 = new byte[4096];
                     else
                         hasAlphas = true;
@@ -275,35 +240,31 @@ namespace WoWViewer.NET.Loaders
                 batch.scales = [.. layerscales];
                 batch.heightMaterialIDs = [.. layerheights];
 
-                var indices = indicelist.ToArray();
-                var vertices = verticelist.ToArray();
-
-                gl.BindBuffer(BufferTargetARB.ArrayBuffer, result.vertexBuffer);
-                fixed (Vertex* buf = vertices)
-                    gl.BufferData(BufferTargetARB.ArrayBuffer, (nuint)vertices.Length * 12 * sizeof(float), buf, GLEnum.StaticDraw);
-
-                var normalAttrib = gl.GetAttribLocation(shaderProgram, "normal");
-                gl.EnableVertexAttribArray((uint)normalAttrib);
-                gl.VertexAttribPointer((uint)normalAttrib, 3, GLEnum.Float, false, sizeof(float) * 12, (void*)(sizeof(float) * 0));
-
-                var colorAttrib = gl.GetAttribLocation(shaderProgram, "color");
-                gl.EnableVertexAttribArray((uint)colorAttrib);
-                gl.VertexAttribPointer((uint)colorAttrib, 4, GLEnum.Float, false, sizeof(float) * 12, (void*)(sizeof(float) * 3));
-
-                var texCoordAttrib = gl.GetAttribLocation(shaderProgram, "texCoord");
-                gl.EnableVertexAttribArray((uint)texCoordAttrib);
-                gl.VertexAttribPointer((uint)texCoordAttrib, 2, GLEnum.Float, false, sizeof(float) * 12, (void*)(sizeof(float) * 7));
-
-                var posAttrib = gl.GetAttribLocation(shaderProgram, "position");
-                gl.EnableVertexAttribArray((uint)posAttrib);
-                gl.VertexAttribPointer((uint)posAttrib, 3, GLEnum.Float, false, sizeof(float) * 12, (void*)(sizeof(float) * 9));
-
-                gl.BindBuffer(BufferTargetARB.ElementArrayBuffer, result.indiceBuffer);
-                fixed (int* buf = indices)
-                    gl.BufferData(BufferTargetARB.ElementArrayBuffer, (nuint)(indices.Length * sizeof(int)), buf, GLEnum.StaticDraw);
-
                 renderBatches.Add(batch);
             }
+
+            var indices = indicelist.ToArray();
+            var vertices = verticelist.ToArray();
+
+            gl.BindBuffer(BufferTargetARB.ArrayBuffer, result.vertexBuffer);
+            fixed (Vertex* buf = vertices)
+                gl.BufferData(BufferTargetARB.ArrayBuffer, (nuint)vertices.Length * 12 * sizeof(float), buf, GLEnum.StaticDraw);
+
+            gl.EnableVertexAttribArray((uint)normalAttrib);
+            gl.VertexAttribPointer((uint)normalAttrib, 3, GLEnum.Float, false, sizeof(float) * 12, (void*)(sizeof(float) * 0));
+
+            gl.EnableVertexAttribArray((uint)colorAttrib);
+            gl.VertexAttribPointer((uint)colorAttrib, 4, GLEnum.Float, false, sizeof(float) * 12, (void*)(sizeof(float) * 3));
+
+            gl.EnableVertexAttribArray((uint)texCoordAttrib);
+            gl.VertexAttribPointer((uint)texCoordAttrib, 2, GLEnum.Float, false, sizeof(float) * 12, (void*)(sizeof(float) * 7));
+
+            gl.EnableVertexAttribArray((uint)posAttrib);
+            gl.VertexAttribPointer((uint)posAttrib, 3, GLEnum.Float, false, sizeof(float) * 12, (void*)(sizeof(float) * 9));
+
+            gl.BindBuffer(BufferTargetARB.ElementArrayBuffer, result.indiceBuffer);
+            fixed (int* buf = indices)
+                gl.BufferData(BufferTargetARB.ElementArrayBuffer, (nuint)(indices.Length * sizeof(int)), buf, GLEnum.StaticDraw);
 
             var doodads = new List<Doodad>();
             var worldModelBatches = new List<WorldModelBatch>();
