@@ -1,15 +1,15 @@
-﻿using ImGuiNET;
+﻿using Hexa.NET.ImGui;
+using Hexa.NET.ImGuizmo;
 using SceneScriptLib;
 using Silk.NET.Input;
 using Silk.NET.Maths;
 using Silk.NET.OpenGL;
-using Silk.NET.OpenGL.Extensions.ImGui;
+using Silk.NET.OpenGL.Extensions.Hexa.ImGui;
 using Silk.NET.Windowing;
 using System.Diagnostics;
 using System.Numerics;
 using System.Reflection;
 using System.Runtime.InteropServices;
-using System.Text;
 using WoWFormatLib.FileProviders;
 using WoWFormatLib.Structs.WDT;
 using WoWViewer.NET.Objects;
@@ -49,6 +49,8 @@ namespace WoWViewer.NET
         private static IWindow window;
         private static Vector2 LastMousePosition;
         private static Vector2? MouseDownPosition;
+        private static float LastScrollValue;
+        private static bool wasMouseDown = false;
 
         private static bool renderADT = true;
         private static bool renderWMO = true;
@@ -70,6 +72,10 @@ namespace WoWViewer.NET
         private static string WDTFDIDInput = CurrentWDTFileDataID.ToString();
 
         private static Container3D? selectedObject = null;
+        private static bool gizmoWasUsing = false;
+        private static bool gizmoWasOver = false;
+        private static ImGuizmoOperation currentGizmoOperation = ImGuizmoOperation.Translate;
+        private static bool wasSpacePressed = false;
 
         static void Main(string[] args)
         {
@@ -96,28 +102,18 @@ namespace WoWViewer.NET
             {
                 gl = window.CreateOpenGL();
 
-                //   gl.Enable(EnableCap.DebugOutput);
-                //    gl.Enable(EnableCap.DebugOutputSynchronous);
                 imGuiController = new ImGuiController(
                     gl,
                     window,
-                    inputContext = window.CreateInput()
+                    inputContext = window.CreateInput(),
+                    null,
+                    () => ImGui.GetIO().ConfigFlags |= ImGuiConfigFlags.DockingEnable
                 );
-
-                ImGui.GetIO().ConfigFlags |= ImGuiConfigFlags.DockingEnable;
-                ImGui.GetIO().ConfigDockingAlwaysTabBar = true;
 
                 ImGui.GetStyle().WindowRounding = 5.0f;
                 ImGui.GetStyle().WindowPadding = new Vector2(0.0f, 0.0f);
                 ImGui.GetStyle().FrameRounding = 12.0f;
-
-                for (int i = 0; i < inputContext.Mice.Count; i++)
-                {
-                    inputContext.Mice[i].MouseMove += OnMouseMove;
-                    inputContext.Mice[i].Scroll += OnMouseWheel;
-                    inputContext.Mice[i].MouseDown += OnMouseDown;
-                    inputContext.Mice[i].MouseUp += OnMouseUp;
-                }
+                ImGuizmo.SetImGuiContext(imGuiController.Context);
 
                 var err = gl.GetError();
                 if (err != GLEnum.NoError)
@@ -187,6 +183,7 @@ namespace WoWViewer.NET
             window.Update += delta =>
             {
                 var primaryKeyboard = inputContext.Keyboards[0];
+                var primaryMouse = inputContext.Mice[0];
 
                 var moveSpeed = movementSpeed * (float)delta;
 
@@ -194,6 +191,54 @@ namespace WoWViewer.NET
                     moveSpeed *= 2.0f;
 
                 imGuiController.Update((float)delta);
+
+                var io = ImGui.GetIO();
+
+                bool gizmoInUse = gizmoWasUsing || gizmoWasOver;
+
+                if (primaryMouse.IsButtonPressed(MouseButton.Left) && !io.WantCaptureMouse && !gizmoInUse)
+                {
+                    var currentMousePos = primaryMouse.Position;
+
+                    if (LastMousePosition == default)
+                    {
+                        LastMousePosition = currentMousePos;
+                    }
+                    else
+                    {
+                        var lookSensitivity = 0.1f;
+                        var xOffset = (currentMousePos.X - LastMousePosition.X) * lookSensitivity;
+                        var yOffset = (LastMousePosition.Y - currentMousePos.Y) * lookSensitivity;
+                        LastMousePosition = currentMousePos;
+
+                        activeCamera.ModifyDirection(xOffset, yOffset);
+                    }
+                }
+                else
+                {
+                    LastMousePosition = default;
+                }
+
+                bool mouseDownThisFrame = primaryMouse.IsButtonPressed(MouseButton.Left);
+                if (mouseDownThisFrame && !wasMouseDown && !io.WantCaptureMouse && !gizmoInUse)
+                {
+                    MouseDownPosition = primaryMouse.Position;
+                }
+
+                if (!mouseDownThisFrame && wasMouseDown)
+                {
+                    if (MouseDownPosition.HasValue && !io.WantCaptureMouse)
+                    {
+                        var dragDistance = Vector2.Distance(MouseDownPosition.Value, primaryMouse.Position);
+                        if (dragDistance < 5.0f)
+                        {
+                            PerformRaycast(primaryMouse.Position.X, primaryMouse.Position.Y);
+                        }
+                    }
+                    MouseDownPosition = null;
+                }
+
+                wasMouseDown = mouseDownThisFrame;
 
                 if (primaryKeyboard.IsKeyPressed(Key.W))
                     activeCamera.Position += moveSpeed * activeCamera.Front;
@@ -215,6 +260,20 @@ namespace WoWViewer.NET
 
                 if (primaryKeyboard.IsKeyPressed(Key.R))
                     activeCamera.Position = Vector3.One;
+
+                bool spacePressed = primaryKeyboard.IsKeyPressed(Key.Space);
+                if (spacePressed && !wasSpacePressed && selectedObject != null && !gizmoInUse)
+                {
+                    currentGizmoOperation = currentGizmoOperation switch
+                    {
+                        ImGuizmoOperation.Translate => ImGuizmoOperation.Rotate,
+                        ImGuizmoOperation.Rotate => ImGuizmoOperation.Scale,
+                        ImGuizmoOperation.Scale => ImGuizmoOperation.Translate,
+                        _ => ImGuizmoOperation.Translate
+                    };
+                    Console.WriteLine($"Gizmo mode switched to: {currentGizmoOperation}");
+                }
+                wasSpacePressed = spacePressed;
 
 #if DEBUG
                 // Note -- this is extremely slow but allows for shader hot-reloading
@@ -269,6 +328,8 @@ namespace WoWViewer.NET
 
                 gl.ClearColor(0f, 0f, 0f, 0.5f);
                 gl.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
+
+                ImGuizmo.BeginFrame();
 
                 if (cascLoaded && CurrentWDT == null)
                     CurrentWDT = Cache.GetOrLoadWDT(CurrentWDTFileDataID);
@@ -355,24 +416,18 @@ namespace WoWViewer.NET
 
                 ImGui.Begin("Map selection");
 
-                var currentWDTBuffer = new byte[100];
-                var currentWDTBytes = Encoding.ASCII.GetBytes(WDTFDIDInput);
-                Array.Copy(currentWDTBytes, currentWDTBuffer, currentWDTBytes.Length);
-                ImGui.InputText("WDT FDID", currentWDTBuffer, 100);
-                WDTFDIDInput = Encoding.ASCII.GetString(currentWDTBuffer).TrimEnd('\0');
+                ImGui.InputText("WDT label", ref WDTFDIDInput, 100);
 
                 if (ImGui.Button("Load WDT"))
                 {
-                    if (uint.TryParse(WDTFDIDInput, out var newWDT) && CurrentWDTFileDataID != newWDT && Services.CASC.FileExists(newWDT))
+                    if (uint.TryParse(WDTFDIDInput, out var newWDTI) && CurrentWDTFileDataID != newWDTI && Services.CASC.FileExists(newWDTI))
                     {
-                        CurrentWDTFileDataID = newWDT;
-
                         loadedTiles.Clear();
 
                         lock (sceneObjectLock)
                             sceneObjects.Clear();
 
-                        CurrentWDTFileDataID = newWDT;
+                        CurrentWDTFileDataID = newWDTI;
                         CurrentWDT = Cache.GetOrLoadWDT(CurrentWDTFileDataID);
                     }
                 }
@@ -557,11 +612,11 @@ namespace WoWViewer.NET
 
             //deselect current
             selectedObject?.IsSelected = false;
-            
+
             //select
             selectedObject = closestObject;
             selectedObject?.IsSelected = true;
-         
+
         }
 
         private static unsafe void RenderScene()
@@ -809,6 +864,9 @@ namespace WoWViewer.NET
             // bounding debug
             debugRenderer.Clear();
 
+            gizmoWasUsing = false;
+            gizmoWasOver = false;
+
             lock (sceneObjectLock)
             {
                 foreach (var sceneObject in sceneObjects)
@@ -819,7 +877,7 @@ namespace WoWViewer.NET
 
                     if (!renderWMO && sceneObject is WMOContainer && !sceneObject.IsSelected)
                         continue;
-                    
+
                     if (!renderM2 && sceneObject is M2Container && !sceneObject.IsSelected)
                         continue;
 
@@ -842,12 +900,100 @@ namespace WoWViewer.NET
                             debugRenderer.DrawSphere(sphere.Value.Center, sphere.Value.Radius, color);
                         }
                     }
+
+                    if (sceneObject.IsSelected)
+                    {
+                        var windowPos = new Vector2(0, 0);
+                        var windowSize = new Vector2(window.Size.X, window.Size.Y);
+
+                        ImGuizmo.SetDrawlist(ImGui.GetForegroundDrawList());
+                        ImGuizmo.Enable(true);
+                        ImGuizmo.SetOrthographic(false);
+                        ImGuizmo.SetRect(windowPos.X, windowPos.Y, windowSize.X, windowSize.Y);
+
+                        var view = activeCamera.GetViewMatrix();
+                        view *= Matrix4x4.CreateRotationZ(MathF.PI / 180f * 180f);
+                        var proj = activeCamera.GetProjectionMatrix();
+
+                        var transform = Matrix4x4.CreateScale(sceneObject.Scale);
+                        transform *= Matrix4x4.CreateRotationX(MathF.PI / 180f * sceneObject.Rotation.X);
+                        transform *= Matrix4x4.CreateRotationY(MathF.PI / 180f * -sceneObject.Rotation.Z);
+                        transform *= Matrix4x4.CreateRotationZ(MathF.PI / 180f * (sceneObject.Rotation.Y - 270f));
+                        transform *= Matrix4x4.CreateTranslation(sceneObject.Position.X, sceneObject.Position.Z * -1, sceneObject.Position.Y);
+                        transform *= Matrix4x4.CreateRotationZ(MathF.PI / 180f * -270f);
+
+                        ImGuizmo.DrawGrid(ref view, ref proj, ref transform, 10);
+                        ImGuizmo.DrawCubes(ref view, ref proj, ref transform, 1);
+
+                        ImGuizmo.PushID(0);
+
+                        if (ImGuizmo.Manipulate(ref view, ref proj, currentGizmoOperation, ImGuizmoMode.Local, ref transform))
+                        {
+                            var inversePostRot = Matrix4x4.CreateRotationZ(MathF.PI / 180f * 270f);
+                            var unrotated = transform * inversePostRot;
+
+                            if (currentGizmoOperation == ImGuizmoOperation.Translate)
+                            {
+                                var newPosition = new Vector3(unrotated.M41, unrotated.M43, -unrotated.M42);
+                                sceneObject.Position = newPosition;
+                            }
+                            else if (currentGizmoOperation == ImGuizmoOperation.Rotate)
+                            {
+                                if (Matrix4x4.Decompose(unrotated, out Vector3 scale, out Quaternion rotation, out Vector3 translation))
+                                {
+                                    var euler = QuaternionToEuler(rotation);
+                                    var xRotationDegrees = euler.X * (180f / MathF.PI);
+                                    var yRotationDegrees = euler.Y * (180f / MathF.PI);
+                                    var zRotationDegrees = euler.Z * (180f / MathF.PI);
+                                    sceneObject.Rotation = new Vector3(
+                                        xRotationDegrees,
+                                        zRotationDegrees + 270f,
+                                        -yRotationDegrees
+                                    );
+                                }
+                            }
+                            else if (currentGizmoOperation == ImGuizmoOperation.Scale)
+                            {
+                                // WoW doesn't support per axis scaling, so average all three axes
+                                var scaleX = new Vector3(unrotated.M11, unrotated.M12, unrotated.M13).Length();
+                                var scaleY = new Vector3(unrotated.M21, unrotated.M22, unrotated.M23).Length();
+                                var scaleZ = new Vector3(unrotated.M31, unrotated.M32, unrotated.M33).Length();
+                                sceneObject.Scale = (scaleX + scaleY + scaleZ) / 3f;
+                            }
+                        }
+
+                        gizmoWasUsing = ImGuizmo.IsUsing();
+                        gizmoWasOver = ImGuizmo.IsOver();
+
+                        ImGuizmo.PopID();
+                    }
                 }
             }
 
             var debugViewMatrix = activeCamera.GetViewMatrix();
             debugViewMatrix *= Matrix4x4.CreateRotationZ(MathF.PI / 180f * 180f);
             debugRenderer.Render(projectionMatrix, debugViewMatrix);
+        }
+
+        private static Vector3 QuaternionToEuler(Quaternion q)
+        {
+            Vector3 euler;
+
+            float sinr_cosp = 2 * (q.W * q.X + q.Y * q.Z);
+            float cosr_cosp = 1 - 2 * (q.X * q.X + q.Y * q.Y);
+            euler.X = MathF.Atan2(sinr_cosp, cosr_cosp);
+
+            float sinp = 2 * (q.W * q.Y - q.Z * q.X);
+            if (MathF.Abs(sinp) >= 1)
+                euler.Y = MathF.CopySign(MathF.PI / 2, sinp);
+            else
+                euler.Y = MathF.Asin(sinp);
+
+            float siny_cosp = 2 * (q.W * q.Z + q.X * q.Y);
+            float cosy_cosp = 1 - 2 * (q.Y * q.Y + q.Z * q.Z);
+            euler.Z = MathF.Atan2(siny_cosp, cosy_cosp);
+
+            return euler;
         }
 
         private static (byte x, byte y) GetTileFromPosition(Vector3 position)

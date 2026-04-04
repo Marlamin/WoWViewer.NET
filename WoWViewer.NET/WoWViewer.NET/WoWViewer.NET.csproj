@@ -10,6 +10,7 @@
 
   <ItemGroup>
     <PackageReference Include="Evergine.Bindings.RenderDoc" Version="2026.4.1.21" />
+    <PackageReference Include="Hexa.NET.ImGuizmo" Version="2.2.9" />
     <PackageReference Include="Silk.NET" Version="2.23.0" />
     <PackageReference Include="Silk.NET.OpenGL.Extensions.ImGui" Version="2.23.0" />
   </ItemGroup>
@@ -18,6 +19,12 @@
     <ProjectReference Include="..\..\SceneScriptLib\SceneScriptLib.csproj" />
     <ProjectReference Include="..\BLPSharp\BLPSharp\BLPSharp.csproj" />
     <ProjectReference Include="..\WoWFormatLib\WoWFormatLib\WoWFormatLib.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="Silk.NET.OpenGL.Extensions.Hexa.ImGui">
+      <HintPath>..\dll\Silk.NET.OpenGL.Extensions.Hexa.ImGui.dll</HintPath>
+    </Reference>
   </ItemGroup>
 
   <ItemGroup>
