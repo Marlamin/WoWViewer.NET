@@ -5,6 +5,7 @@ using Silk.NET.Maths;
 using Silk.NET.OpenGL;
 using Silk.NET.OpenGL.Extensions.ImGui;
 using Silk.NET.Windowing;
+using System.Diagnostics;
 using System.Numerics;
 using System.Reflection;
 using System.Runtime.InteropServices;
@@ -253,7 +254,13 @@ namespace WoWViewer.NET
                     var tilesLoaded = totalTilesToLoad - tilesToLoad.Count;
                     statusMessage = $"Loading tile {mapTile.tileX},{mapTile.tileY} ({tilesLoaded}/{totalTilesToLoad})...";
 
+                    var timer = new Stopwatch();
+                    timer.Start();
                     var adt = Cache.GetOrLoadADT(gl, mapTile, adtShaderProgram, mapTile.wdtFileDataID);
+                    timer.Stop();
+
+                    Console.WriteLine($"Loaded ADT {mapTile.tileX},{mapTile.tileY} in {timer.ElapsedMilliseconds} ms");
+
                     var adtContainer = new ADTContainer(gl, adt, mapTile, adtShaderProgram);
                     sceneObjects.Add(adtContainer);
 
@@ -782,9 +789,29 @@ namespace WoWViewer.NET
                     loadedTiles.Remove(tile);
 
                     lock (sceneObjectLock)
-                        sceneObjects.RemoveAll(x => x is ADTContainer adt && adt.mapTile.wdtFileDataID == tile.wdtFileDataID && adt.mapTile.tileX == tile.tileX && adt.mapTile.tileY == tile.tileY);
+                    {
+                        // Not a fan of using LINQ here, probably need a better way for this
+                        var adtToRemove = sceneObjects.FirstOrDefault(x => x is ADTContainer adt && adt.mapTile.wdtFileDataID == tile.wdtFileDataID && adt.mapTile.tileX == tile.tileX && adt.mapTile.tileY == tile.tileY) as ADTContainer;
+                        if (adtToRemove != null)
+                        {
+                            sceneObjects.Remove(adtToRemove);
+                            Cache.ReleaseADT(gl, adtToRemove.mapTile, adtToRemove.mapTile.wdtFileDataID);
 
-                    Cache.ReleaseADT(gl, tile, tile.wdtFileDataID);
+                            List<WMOContainer> wmosToRemove = sceneObjects.Where(x => x is WMOContainer wmo && wmo.ParentFileDataId == adtToRemove.Terrain.rootADTFileDataID).Select(x => (WMOContainer)x).ToList();
+                            foreach (var wmo in wmosToRemove)
+                            {
+                                sceneObjects.Remove(wmo);
+                                Cache.ReleaseWMO(gl, wmo.FileDataId, wmo.ParentFileDataId);
+                            }
+
+                            List<M2Container> m2sToRemove = sceneObjects.Where(x => x is M2Container m2 && m2.ParentFileDataId == adtToRemove.Terrain.rootADTFileDataID).Select(x => (M2Container)x).ToList();
+                            foreach (var m2 in m2sToRemove)
+                            {
+                                sceneObjects.Remove(m2);
+                                Cache.ReleaseM2(gl, m2.FileDataId, m2.ParentFileDataId);
+                            }
+                        }
+                    }
                 }
             }
         }
