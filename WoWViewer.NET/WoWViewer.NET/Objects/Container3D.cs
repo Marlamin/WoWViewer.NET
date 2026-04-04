@@ -12,6 +12,8 @@ namespace WoWViewer.NET.Objects
         public Vector3 Rotation { get; set; }
         public float Scale;
 
+        public bool IsSelected { get; set; } = false;
+
         public Container3D(GL gl, uint fileDataId, uint shaderProgram, uint parentFileDataId)
         {
             FileDataId = fileDataId;

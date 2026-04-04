@@ -48,6 +48,7 @@ namespace WoWViewer.NET
 
         private static IWindow window;
         private static Vector2 LastMousePosition;
+        private static Vector2? MouseDownPosition;
 
         private static bool renderADT = true;
         private static bool renderWMO = true;
@@ -67,6 +68,8 @@ namespace WoWViewer.NET
         private static WDT? CurrentWDT;
         private static uint CurrentWDTFileDataID = 775971;
         private static string WDTFDIDInput = CurrentWDTFileDataID.ToString();
+
+        private static Container3D? selectedObject = null;
 
         static void Main(string[] args)
         {
@@ -112,6 +115,8 @@ namespace WoWViewer.NET
                 {
                     inputContext.Mice[i].MouseMove += OnMouseMove;
                     inputContext.Mice[i].Scroll += OnMouseWheel;
+                    inputContext.Mice[i].MouseDown += OnMouseDown;
+                    inputContext.Mice[i].MouseUp += OnMouseUp;
                 }
 
                 var err = gl.GetError();
@@ -383,6 +388,17 @@ namespace WoWViewer.NET
                     ImGui.Checkbox("Render WMO", ref renderWMO);
                     ImGui.Checkbox("Render M2", ref renderM2);
 
+                    if (selectedObject != null)
+                    {
+                        ImGui.Text("Selected Object: " + selectedObject.FileDataId);
+
+                        if (ImGui.Button("Deselect"))
+                        {
+                            selectedObject.IsSelected = false;
+                            selectedObject = null;
+                        }
+                    }
+
                     ImGui.Checkbox("Show Bounding Boxes", ref showBoundingBoxes);
                     ImGui.Checkbox("Show Bounding Spheres", ref showBoundingSpheres);
 
@@ -550,6 +566,90 @@ namespace WoWViewer.NET
                 return;
 
             activeCamera.ModifyZoom(scrollWheel.Y);
+        }
+
+        private static void OnMouseDown(IMouse mouse, MouseButton button)
+        {
+            if (button == MouseButton.Left && !ImGui.IsWindowHovered(ImGuiHoveredFlags.AnyWindow) && !ImGui.IsAnyItemActive())
+            {
+                MouseDownPosition = mouse.Position;
+            }
+        }
+
+        private static void OnMouseUp(IMouse mouse, MouseButton button)
+        {
+            if (button == MouseButton.Left && MouseDownPosition.HasValue && !ImGui.IsWindowHovered(ImGuiHoveredFlags.AnyWindow) && !ImGui.IsAnyItemActive())
+            {
+                var dragDistance = Vector2.Distance(MouseDownPosition.Value, mouse.Position);
+
+                if (dragDistance < 5.0f)
+                    PerformRaycast(mouse.Position.X, mouse.Position.Y);
+
+                MouseDownPosition = null;
+            }
+        }
+
+        private static void PerformRaycast(float mouseX, float mouseY)
+        {
+            var ray = activeCamera.GetRayFromScreen(mouseX, mouseY, window.Size.X, window.Size.Y);
+
+            Container3D? closestObject = null;
+            float closestDistance = float.MaxValue;
+
+            lock (sceneObjectLock)
+            {
+                int testCount = 0;
+                foreach (var sceneObject in sceneObjects)
+                {
+                    // Skip ADT for now
+                    if (sceneObject is ADTContainer)
+                        continue;
+
+                    // dont raycast against WMOs if they arent rendering
+                    if (!renderWMO && sceneObject is WMOContainer)
+                        continue;
+
+
+                    // dont raycast against M2s if they arent rendering
+                    if (!renderM2 && sceneObject is M2Container)
+                        continue;
+
+                    testCount++;
+
+                    var sphere = sceneObject.GetBoundingSphere();
+                    if (sphere.HasValue)
+                    {
+                        if (IntersectionTests.RayIntersectsSphere(ray, sphere.Value, out float sphereDistance))
+                        {
+                            if (sphereDistance < closestDistance)
+                            {
+                                var box = sceneObject.GetBoundingBox();
+                                if (box.HasValue && IntersectionTests.RayIntersectsBox(ray, box.Value, out float boxDistance))
+                                {
+                                    if (boxDistance < closestDistance)
+                                    {
+                                        closestDistance = boxDistance;
+                                        closestObject = sceneObject;
+                                    }
+                                }
+                                else if (!box.HasValue)
+                                {
+                                    closestDistance = sphereDistance;
+                                    closestObject = sceneObject;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            //deselect current
+            selectedObject?.IsSelected = false;
+            
+            //select
+            selectedObject = closestObject;
+            selectedObject?.IsSelected = true;
+         
         }
 
         private static unsafe void RenderScene()
@@ -806,7 +906,14 @@ namespace WoWViewer.NET
                     // dont render debug render adt 
                     if (sceneObject is ADTContainer)
                         continue;
-                    var color = new Vector4(1, 1, 0, 1); // yellow
+
+                    if (!renderWMO && sceneObject is WMOContainer && !sceneObject.IsSelected)
+                        continue;
+                    
+                    if (!renderM2 && sceneObject is M2Container && !sceneObject.IsSelected)
+                        continue;
+
+                    var color = sceneObject.IsSelected ? new Vector4(0, 1, 0, 1) : new Vector4(1, 1, 0, 1); // geen if selected, yellow if not
 
                     if (showBoundingBoxes)
                     {

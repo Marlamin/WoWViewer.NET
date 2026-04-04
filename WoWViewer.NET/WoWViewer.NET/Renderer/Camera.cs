@@ -1,4 +1,5 @@
 ﻿using System.Numerics;
+using WoWViewer.NET.Raycasting;
 
 public class Camera
 {
@@ -60,6 +61,39 @@ public class Camera
     {
         return Matrix4x4.CreatePerspectiveFieldOfView(DegreesToRadians(Zoom), AspectRatio, 10.0f, 4096.0f);
     }
+
+    public Ray GetRayFromScreen(float screenX, float screenY, int screenWidth, int screenHeight)
+    {
+        //Console.WriteLine("ScreenX: " + screenX + " ScreenY: " + screenY);
+        (float x, float y) = ((2.0f * screenX) / screenWidth - 1.0f, 1.0f - (2.0f * screenY) / screenHeight);
+
+       // Console.WriteLine("Normalized Device Coordinates: " + x + ", " + y);
+
+        var clipCoords = new Vector4(x, y, -1.0f, 1.0f);
+
+        // invert the projection matrix
+        Matrix4x4.Invert(GetProjectionMatrix(), out var invProjection);
+
+        // get eye coords by multiplying clip coords with inverse projection matrix
+        var eyeCoords = Vector4.Transform(clipCoords, invProjection);
+        eyeCoords = new Vector4(eyeCoords.X, eyeCoords.Y, -1.0f, 0.0f);
+
+        //Console.WriteLine("Eye Coords: " + eyeCoords);
+
+        // Apply the same 180° rotation that's used in rendering
+        var viewMatrix = GetViewMatrix();
+        viewMatrix *= Matrix4x4.CreateRotationZ(MathF.PI / 180f * 180f);
+        Matrix4x4.Invert(viewMatrix, out var invView);
+
+        // get world coords by multiplying eye coords with inverse view matrix
+        var worldCoords = Vector4.Transform(eyeCoords, invView);
+        var rayDirection = Vector3.Normalize(new Vector3(worldCoords.X, worldCoords.Y, worldCoords.Z));
+
+        //Console.WriteLine("world Coords: " + worldCoords);
+
+        return new Ray(Position, rayDirection);
+    }
+
     public static float DegreesToRadians(float degrees)
     {
         return MathF.PI / 180f * degrees;
