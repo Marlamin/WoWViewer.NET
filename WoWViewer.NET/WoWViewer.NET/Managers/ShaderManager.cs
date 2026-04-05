@@ -10,6 +10,7 @@ namespace WoWViewer.NET.Managers
         private static readonly Dictionary<string, DateTime> shaderMTimes = [];
         public bool shadersReady = false;
         private readonly string shaderFolder;
+        private static Dictionary<(uint, string), int> uniformCache = [];
 
         public ShaderManager(GL gl, string shaderFolder)
         {
@@ -28,6 +29,18 @@ namespace WoWViewer.NET.Managers
             shaderProgram = CompileShader(type);
             _compiledShaders[type] = shaderProgram;
             return shaderProgram;
+        }
+
+        public int GetUniformLocation(uint shaderProgram, string uniformName)
+        {
+            var key = (shaderProgram, uniformName);
+            if (uniformCache.TryGetValue(key, out var location))
+                return location;
+
+            location = _gl.GetUniformLocation(shaderProgram, uniformName);
+            uniformCache[key] = location;
+
+            return location;
         }
 
         public void Dispose()

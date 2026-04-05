@@ -9,9 +9,10 @@ using static WoWViewer.NET.Structs;
 
 namespace WoWViewer.NET.Managers
 {
-    public class SceneManager(GL gl) : IDisposable
+    public class SceneManager(GL gl, ShaderManager shaderManager) : IDisposable
     {
         private readonly GL _gl = gl ?? throw new ArgumentNullException(nameof(gl));
+        private readonly ShaderManager _shaderManager = shaderManager ?? throw new ArgumentNullException(nameof(shaderManager));
 
         public List<Container3D> SceneObjects { get; } = [];
         public Lock SceneObjectLock { get; } = new();
@@ -38,23 +39,90 @@ namespace WoWViewer.NET.Managers
 
         private uint defaultTextureID;
 
+        // Shader programs
         private uint adtShaderProgram;
         private uint wmoShaderProgram;
         private uint m2ShaderProgram;
         private uint debugShaderProgram;
 
+        // Shader uniforms
+        private int m2ProjLocation;
+        private int m2ViewLocation;
+        private int m2ModelLocation;
+
+        private int wmoProjLocation;
+        private int wmoViewLocation;
+        private int wmoModelLocation;
+        private int wmoVertexShaderIDLocation;
+        private int wmoPixelShaderIDLocation;
+
+        private int adtProjLocation;
+        private int adtRotLocation;
+        private int adtModelLocation;
+
+        private int adtLightDirLocation;
+        private int m2LightDirLocation;
+        private int wmoLightDirLocation;
+
+        private readonly int[] heightScaleUniforms = new int[8];
+        private readonly int[] heightOffsetUniforms = new int[8];
+        private readonly int[] layerScaleUniforms = new int[8];
+        private readonly int[] alphaLayerUniforms = new int[2];
+        private readonly int[] diffuseLayerUniforms = new int[8];
+        private readonly int[] heightLayerUniforms = new int[8];
+
+        private int m2AlphaRefLoc;
+        private int wmoAlphaRefLoc;
+
         public bool SceneLoaded => loadedTiles.Count > 0;
         public string StatusMessage { get; private set; } = "";
 
-        public void Initialize(uint adtShader, uint wmoShader, uint m2Shader, uint debugShader)
+        public void Initialize(ShaderManager shaderManager, uint adtShader, uint wmoShader, uint m2Shader, uint debugShader)
         {
             adtShaderProgram = adtShader;
             wmoShaderProgram = wmoShader;
             m2ShaderProgram = m2Shader;
             debugShaderProgram = debugShader;
 
+            RefreshUniforms();
+
             debugRenderer = new DebugRenderer(_gl, debugShaderProgram);
             defaultTextureID = MakeDefaultTexture();
+        }
+
+        public void RefreshUniforms()
+        {
+            m2ProjLocation = _shaderManager.GetUniformLocation(m2ShaderProgram, "projection_matrix");
+            m2ViewLocation = _shaderManager.GetUniformLocation(m2ShaderProgram, "view_matrix");
+            m2ModelLocation = _shaderManager.GetUniformLocation(m2ShaderProgram, "model_matrix");
+
+            wmoProjLocation = _shaderManager.GetUniformLocation(wmoShaderProgram, "projection_matrix");
+            wmoViewLocation = _shaderManager.GetUniformLocation(wmoShaderProgram, "view_matrix");
+            wmoModelLocation = _shaderManager.GetUniformLocation(wmoShaderProgram, "model_matrix");
+            wmoVertexShaderIDLocation = _shaderManager.GetUniformLocation(wmoShaderProgram, "vertexShader");
+            wmoPixelShaderIDLocation = _shaderManager.GetUniformLocation(wmoShaderProgram, "pixelShader");
+
+            adtProjLocation = _shaderManager.GetUniformLocation(adtShaderProgram, "projection_matrix");
+            adtRotLocation = _shaderManager.GetUniformLocation(adtShaderProgram, "rotation_matrix");
+            adtModelLocation = _shaderManager.GetUniformLocation(adtShaderProgram, "model_matrix");
+            adtLightDirLocation = _shaderManager.GetUniformLocation(adtShaderProgram, "lightDirection");
+            m2LightDirLocation = _shaderManager.GetUniformLocation(m2ShaderProgram, "lightDirection");
+            wmoLightDirLocation = _shaderManager.GetUniformLocation(wmoShaderProgram, "lightDirection");
+
+            for (int i = 0; i < 8; i++)
+            {
+                heightScaleUniforms[i] = _shaderManager.GetUniformLocation(adtShaderProgram, $"heightScales[{i}]");
+                heightOffsetUniforms[i] = _shaderManager.GetUniformLocation(adtShaderProgram, $"heightOffsets[{i}]");
+                layerScaleUniforms[i] = _shaderManager.GetUniformLocation(adtShaderProgram, $"layerScales[{i}]");
+                diffuseLayerUniforms[i] = _shaderManager.GetUniformLocation(adtShaderProgram, $"diffuseLayers[{i}]");
+                heightLayerUniforms[i] = _shaderManager.GetUniformLocation(adtShaderProgram, $"heightLayers[{i}]");
+            }
+
+            for (int i = 0; i < 2; i++)
+                alphaLayerUniforms[i] = _shaderManager.GetUniformLocation(adtShaderProgram, $"alphaLayers[{i}]");
+
+            m2AlphaRefLoc = _shaderManager.GetUniformLocation(m2ShaderProgram, "alphaRef");
+            wmoAlphaRefLoc = _shaderManager.GetUniformLocation(wmoShaderProgram, "alphaRef");
         }
 
         public void LoadWDT(uint wdtFileDataID)
@@ -290,51 +358,6 @@ namespace WoWViewer.NET.Managers
 
         public unsafe void RenderScene(Camera camera, out bool gizmoWasUsing, out bool gizmoWasOver)
         {
-            var m2ProjLocation = _gl.GetUniformLocation(m2ShaderProgram, "projection_matrix");
-            var m2ViewLocation = _gl.GetUniformLocation(m2ShaderProgram, "view_matrix");
-            var m2ModelLocation = _gl.GetUniformLocation(m2ShaderProgram, "model_matrix");
-
-            var wmoProjLocation = _gl.GetUniformLocation(wmoShaderProgram, "projection_matrix");
-            var wmoViewLocation = _gl.GetUniformLocation(wmoShaderProgram, "view_matrix");
-            var wmoModelLocation = _gl.GetUniformLocation(wmoShaderProgram, "model_matrix");
-            var wmoVertexShaderIDLocation = _gl.GetUniformLocation(wmoShaderProgram, "vertexShader");
-            var wmoPixelShaderIDLocation = _gl.GetUniformLocation(wmoShaderProgram, "pixelShader");
-
-            var adtProjLocation = _gl.GetUniformLocation(adtShaderProgram, "projection_matrix");
-            var adtRotLocation = _gl.GetUniformLocation(adtShaderProgram, "rotation_matrix");
-            var adtModelLocation = _gl.GetUniformLocation(adtShaderProgram, "model_matrix");
-
-            var adtLightDirectionLocation = _gl.GetUniformLocation(adtShaderProgram, "lightDirection");
-            var m2LightDirectionLocation = _gl.GetUniformLocation(m2ShaderProgram, "lightDirection");
-            var wmoLightDirectionLocation = _gl.GetUniformLocation(wmoShaderProgram, "lightDirection");
-
-            var heightScaleUniforms = new int[8];
-            for (int i = 0; i < 8; i++)
-                heightScaleUniforms[i] = _gl.GetUniformLocation(adtShaderProgram, $"heightScales[{i}]");
-
-            var heightOffsetUniforms = new int[8];
-            for (int i = 0; i < 8; i++)
-                heightOffsetUniforms[i] = _gl.GetUniformLocation(adtShaderProgram, $"heightOffsets[{i}]");
-
-            var layerScaleUniforms = new int[8];
-            for (int i = 0; i < 8; i++)
-                layerScaleUniforms[i] = _gl.GetUniformLocation(adtShaderProgram, $"layerScales[{i}]");
-
-            var alphaLayerUniforms = new int[2];
-            for (int i = 0; i < 2; i++)
-                alphaLayerUniforms[i] = _gl.GetUniformLocation(adtShaderProgram, $"alphaLayers[{i}]");
-
-            var diffuseLayerUniforms = new int[8];
-            for (int i = 0; i < 8; i++)
-                diffuseLayerUniforms[i] = _gl.GetUniformLocation(adtShaderProgram, $"diffuseLayers[{i}]");
-
-            var heightLayerUniforms = new int[8];
-            for (int i = 0; i < 8; i++)
-                heightLayerUniforms[i] = _gl.GetUniformLocation(adtShaderProgram, $"heightLayers[{i}]");
-
-            var m2AlphaRefLoc = _gl.GetUniformLocation(m2ShaderProgram, "alphaRef");
-            var wmoAlphaRefLoc = _gl.GetUniformLocation(wmoShaderProgram, "alphaRef");
-
             var projectionMatrix = camera.GetProjectionMatrix();
 
             foreach (var sceneObject in SceneObjects)
@@ -369,7 +392,7 @@ namespace WoWViewer.NET.Managers
 
                     _gl.UniformMatrix4(m2ModelLocation, 1, false, (float*)&modelMatrix);
 
-                    _gl.Uniform3(m2LightDirectionLocation, LightDirection.X, LightDirection.Y, LightDirection.Z);
+                    _gl.Uniform3(m2LightDirLocation, LightDirection.X, LightDirection.Y, LightDirection.Z);
 
                     _gl.ActiveTexture(TextureUnit.Texture0);
 
@@ -413,7 +436,7 @@ namespace WoWViewer.NET.Managers
 
                     _gl.UniformMatrix4(wmoModelLocation, 1, false, (float*)&modelMatrix);
 
-                    _gl.Uniform3(wmoLightDirectionLocation, LightDirection.X, LightDirection.Y, LightDirection.Z);
+                    _gl.Uniform3(wmoLightDirLocation, LightDirection.X, LightDirection.Y, LightDirection.Z);
 
                     for (var j = 0; j < wmo.wmoRenderBatch.Length; j++)
                     {
@@ -462,7 +485,7 @@ namespace WoWViewer.NET.Managers
                     _gl.UniformMatrix4(adtRotLocation, 1, false, (float*)&rotationMatrix);
                     _gl.UniformMatrix4(adtProjLocation, 1, false, (float*)&projectionMatrix);
 
-                    _gl.Uniform3(adtLightDirectionLocation, LightDirection.X, LightDirection.Y, LightDirection.Z);
+                    _gl.Uniform3(adtLightDirLocation, LightDirection.X, LightDirection.Y, LightDirection.Z);
 
                     _gl.BindVertexArray(adt.Terrain.vao);
                     _gl.Disable(EnableCap.Blend);
@@ -494,6 +517,8 @@ namespace WoWViewer.NET.Managers
 
                         _gl.DrawElements(PrimitiveType.Triangles, (uint)((c + 1) * 768) - (uint)c * 768, DrawElementsType.UnsignedInt, (void*)((c * 768) * 4));
 
+                        // Apparently we can get away not doing this now? TBD
+                        /*
                         for (int j = 0; j < 8; j++)
                         {
                             _gl.ActiveTexture(TextureUnit.Texture0 + j);
@@ -503,6 +528,7 @@ namespace WoWViewer.NET.Managers
                             _gl.ActiveTexture(TextureUnit.Texture15 + j);
                             _gl.BindTexture(TextureTarget.Texture2D, 0);
                         }
+                        */
                     }
                 }
             }

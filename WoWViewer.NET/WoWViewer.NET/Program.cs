@@ -68,7 +68,7 @@ namespace WoWViewer.NET
                 gl = window.CreateOpenGL();
 
                 shaderManager = new ShaderManager(gl, Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location)!, "Shaders"));
-                sceneManager = new SceneManager(gl);
+                sceneManager = new SceneManager(gl, shaderManager);
 
                 imGuiController = new ImGuiController(
                     gl,
@@ -94,7 +94,7 @@ namespace WoWViewer.NET
                 m2ShaderProgram = shaderManager.GetOrCompileShader("m2");
                 debugShaderProgram = shaderManager.GetOrCompileShader("debug");
 
-                sceneManager.Initialize(adtShaderProgram, wmoShaderProgram, m2ShaderProgram, debugShaderProgram);
+                sceneManager.Initialize(shaderManager, adtShaderProgram, wmoShaderProgram, m2ShaderProgram, debugShaderProgram);
                 WDTFDIDInput = sceneManager.CurrentWDTFileDataID.ToString();
                 shadersReady = true;
 
