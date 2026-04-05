@@ -176,9 +176,9 @@ namespace WoWViewer.NET.Loaders
                 gl.BufferData(BufferTargetARB.ArrayBuffer, (nuint)(modelvertices.Length * 8 * sizeof(float)), buf, GLEnum.StaticDraw);
 
             //Set pointers in buffer
-            //var normalAttrib = GL.GetAttribLocation(shaderProgram, "normal");
-            //GL.EnableVertexAttribArray(normalAttrib);
-            //GL.VertexAttribPointer(normalAttrib, 3, VertexAttribPointerType.Float, false, sizeof(float) * 8, sizeof(float) * 0);
+            var normalAttrib = gl.GetAttribLocation(shaderProgram, "normal");
+            gl.EnableVertexAttribArray((uint)normalAttrib);
+            gl.VertexAttribPointer((uint)normalAttrib, 3, VertexAttribPointerType.Float, false, sizeof(float) * 8, (void*)(sizeof(float) * 0));
 
             var texCoordAttrib = gl.GetAttribLocation(shaderProgram, "texCoord");
             gl.EnableVertexAttribArray((uint)texCoordAttrib);
