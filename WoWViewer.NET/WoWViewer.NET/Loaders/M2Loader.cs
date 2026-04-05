@@ -112,16 +112,9 @@ namespace WoWViewer.NET.Loaders
                         }
                         else
                         {
-                            if (Listfile.FilenameToFDID.TryGetValue(model.textures[model.texlookup[model.skins[0].textureunit[tu].texture].textureID].filename.Replace('\\', '/').ToLower(), out var filedataid))
-                            {
-                                textureFileDataID = filedataid;
-                            }
-                            else
-                            {
-                                textureFileDataID = DEFAULT_TEXTURE_ID;
-                                if (!FileProvider.FileExists(textureFileDataID))
-                                    textureFileDataID = MISSING_TEXTURE_ID;
-                            }
+                            textureFileDataID = DEFAULT_TEXTURE_ID;
+                            if (!FileProvider.FileExists(textureFileDataID))
+                                textureFileDataID = MISSING_TEXTURE_ID;
                         }
 
                         if (!FileProvider.FileExists(textureFileDataID))

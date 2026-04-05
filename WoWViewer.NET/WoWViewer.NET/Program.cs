@@ -1,42 +1,29 @@
-﻿using Hexa.NET.ImGui;
+using Hexa.NET.ImGui;
 using Hexa.NET.ImGuizmo;
-using SceneScriptLib;
 using Silk.NET.Input;
 using Silk.NET.Maths;
 using Silk.NET.OpenGL;
 using Silk.NET.OpenGL.Extensions.Hexa.ImGui;
 using Silk.NET.Windowing;
-using System.Diagnostics;
 using System.Numerics;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using WoWFormatLib.FileProviders;
-using WoWFormatLib.Structs.WDT;
 using WoWViewer.NET.Managers;
 using WoWViewer.NET.Objects;
-using WoWViewer.NET.Raycasting;
-using WoWViewer.NET.Renderer;
-using static WoWViewer.NET.Structs;
 
 namespace WoWViewer.NET
 {
     internal class Program
     {
         private static bool cascLoaded = false;
-        private static bool sceneLoaded = false;
-
-        private static string statusMessage = "";
 
         private static uint adtShaderProgram;
         private static uint wmoShaderProgram;
         private static uint m2ShaderProgram;
         private static uint debugShaderProgram;
-        private static DebugRenderer debugRenderer;
-        private static bool showBoundingBoxes = false;
-        private static bool showBoundingSpheres = false;
 
         private static float movementSpeed = 150f;
-        private static readonly bool isMouseDragging = false;
         private static bool hasFocus = true;
 
         public static GL gl;
@@ -44,43 +31,22 @@ namespace WoWViewer.NET
         private static Camera activeCamera;
         private static IInputContext inputContext;
 
-        public static List<Container3D> sceneObjects = [];
-        public static Lock sceneObjectLock = new();
-
         private static IWindow window;
         private static Vector2 LastMousePosition;
         private static Vector2? MouseDownPosition;
-        private static float LastScrollValue;
         private static bool wasMouseDown = false;
 
-        private static bool renderADT = true;
-        private static bool renderWMO = true;
-        private static bool renderM2 = false;
         private static bool shadersReady = false;
 
-        private static readonly Dictionary<string, DateTime> shaderMTimes = [];
-        private static readonly List<TimelineScene> scenes = [];
+        private static string WDTFDIDInput = "";
 
-        private static uint defaultTextureID;
-
-        private static Queue<MapTile> tilesToLoad = new();
-        private static int totalTilesToLoad = 0;
-        private static Dictionary<uint, uint> uuidUsers = [];
-        private static HashSet<MapTile> loadedTiles = [];
-
-        private static WDT? CurrentWDT;
-        private static uint CurrentWDTFileDataID = 775971;
-        private static string WDTFDIDInput = CurrentWDTFileDataID.ToString();
-
-        private static Container3D? selectedObject = null;
         private static bool gizmoWasUsing = false;
         private static bool gizmoWasOver = false;
         private static ImGuizmoOperation currentGizmoOperation = ImGuizmoOperation.Translate;
         private static bool wasSpacePressed = false;
 
         private static ShaderManager shaderManager;
-
-        private static Vector3 lightDirection = new Vector3(0.5f, 1f, 0.5f);
+        private static SceneManager sceneManager;
         static void Main(string[] args)
         {
             var windowOptions = WindowOptions.Default;
@@ -102,6 +68,7 @@ namespace WoWViewer.NET
                 gl = window.CreateOpenGL();
 
                 shaderManager = new ShaderManager(gl, Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location)!, "Shaders"));
+                sceneManager = new SceneManager(gl);
 
                 imGuiController = new ImGuiController(
                     gl,
@@ -126,11 +93,12 @@ namespace WoWViewer.NET
                 wmoShaderProgram = shaderManager.GetOrCompileShader("wmo");
                 m2ShaderProgram = shaderManager.GetOrCompileShader("m2");
                 debugShaderProgram = shaderManager.GetOrCompileShader("debug");
-                debugRenderer = new DebugRenderer(gl, debugShaderProgram);
+
+                sceneManager.Initialize(adtShaderProgram, wmoShaderProgram, m2ShaderProgram, debugShaderProgram);
+                WDTFDIDInput = sceneManager.CurrentWDTFileDataID.ToString();
                 shadersReady = true;
 
                 // Start CASC initialization in background
-                statusMessage = "Initializing CASC..";
                 Task.Run(async () =>
                 {
                     await Services.CASC.Initialize();
@@ -141,8 +109,6 @@ namespace WoWViewer.NET
                     FileProvider.SetProvider(tactFileProvider, TACTSharpFileProvider.BuildName);
 
                     cascLoaded = true;
-
-                    statusMessage = "";
                 });
 
                 activeCamera = new Camera(new Vector3(0f, -0f, 200f), Vector3.UnitX, Vector3.UnitZ * -1, (float)window.FramebufferSize.X / (float)window.FramebufferSize.Y);
@@ -166,8 +132,6 @@ namespace WoWViewer.NET
                         Console.Error.WriteLine($"[DebugMessageCallback] source: {source}, type: {type}, id: {id}, severity {severity}, length {length}, userParam {userparam}\n{msg}\n\n");
                     }, (void*)0);
                 }
-
-                defaultTextureID = MakeDefaultTexture();
             };
 
             window.FramebufferResize += s =>
@@ -233,7 +197,7 @@ namespace WoWViewer.NET
                         var dragDistance = Vector2.Distance(MouseDownPosition.Value, primaryMouse.Position);
                         if (dragDistance < 5.0f)
                         {
-                            PerformRaycast(primaryMouse.Position.X, primaryMouse.Position.Y);
+                            sceneManager.PerformRaycast(primaryMouse.Position.X, primaryMouse.Position.Y, activeCamera, window.Size.X, window.Size.Y);
                         }
                     }
                     MouseDownPosition = null;
@@ -263,7 +227,7 @@ namespace WoWViewer.NET
                     activeCamera.Position = Vector3.One;
 
                 bool spacePressed = primaryKeyboard.IsKeyPressed(Key.Space);
-                if (spacePressed && !wasSpacePressed && selectedObject != null && !gizmoWasUsing)
+                if (spacePressed && !wasSpacePressed && sceneManager.SelectedObject != null && !gizmoWasUsing)
                 {
                     currentGizmoOperation = currentGizmoOperation switch
                     {
@@ -302,86 +266,17 @@ namespace WoWViewer.NET
 
                 ImGuizmo.BeginFrame();
 
-                if (cascLoaded && CurrentWDT == null)
-                    CurrentWDT = Cache.GetOrLoadWDT(CurrentWDTFileDataID);
+                if (cascLoaded)
+                    sceneManager.GetCurrentWDT();
 
-                if (tilesToLoad.Count > 0)
-                {
-                    var mapTile = tilesToLoad.Dequeue();
-                    var tilesLoaded = totalTilesToLoad - tilesToLoad.Count;
-                    statusMessage = $"Loading tile {mapTile.tileX},{mapTile.tileY} ({tilesLoaded}/{totalTilesToLoad})...";
+                sceneManager.ProcessNextTile();
 
-                    var timer = new Stopwatch();
-                    timer.Start();
+                sceneManager.UpdateTilesByCameraPos(activeCamera.Position);
 
-                    Renderer.Structs.Terrain adt;
-
-                    try
-                    {
-                        adt = Cache.GetOrLoadADT(gl, mapTile, adtShaderProgram, mapTile.wdtFileDataID);
-                    }
-                    catch (Exception ex)
-                    {
-                        Console.WriteLine("Error loading ADT: " + ex.ToString());
-                        return;
-                    }
-
-                    timer.Stop();
-
-                    Console.WriteLine($"Loaded ADT {mapTile.tileX},{mapTile.tileY} in {timer.ElapsedMilliseconds} ms");
-
-                    var adtContainer = new ADTContainer(gl, adt, mapTile, adtShaderProgram);
-                    sceneObjects.Add(adtContainer);
-
-                    foreach (var worldModel in adt.worldModelBatches)
-                    {
-                        if (uuidUsers.ContainsKey(worldModel.uniqueID))
-                            continue;
-
-                        var worldModelContainer = new WMOContainer(gl, worldModel.fileDataID, wmoShaderProgram, adt.rootADTFileDataID)
-                        {
-                            Position = worldModel.position,
-                            Rotation = worldModel.rotation,
-                            Scale = worldModel.scale,
-                            UniqueID = worldModel.uniqueID
-                        };
-
-                        sceneObjects.Add(worldModelContainer);
-
-                        if (uuidUsers.TryGetValue(worldModel.uniqueID, out var count))
-                            uuidUsers[worldModel.uniqueID] = count + 1;
-                        else
-                            uuidUsers[worldModel.uniqueID] = 1;
-                    }
-
-                    foreach (var doodad in adt.doodads)
-                    {
-                        var doodadContainer = new M2Container(gl, doodad.fileDataID, m2ShaderProgram, adt.rootADTFileDataID)
-                        {
-                            Position = doodad.position,
-                            Rotation = doodad.rotation,
-                            Scale = doodad.scale
-                        };
-
-                        sceneObjects.Add(doodadContainer);
-                    }
-
-                    // Mark this tile as loaded
-                    loadedTiles.Add(mapTile);
-
-                    if (tilesToLoad.Count == 0)
-                    {
-                        sceneLoaded = true;
-                        statusMessage = "";
-                    }
-                }
-
-                UpdateTilesByCameraPos();
-
-                if (!string.IsNullOrEmpty(statusMessage))
+                if (!string.IsNullOrEmpty(sceneManager.StatusMessage))
                 {
                     ImGui.Begin("Loading");
-                    ImGui.Text(statusMessage);
+                    ImGui.Text(sceneManager.StatusMessage);
                     ImGui.End();
                 }
 
@@ -391,40 +286,47 @@ namespace WoWViewer.NET
 
                 if (ImGui.Button("Load WDT"))
                 {
-                    if (uint.TryParse(WDTFDIDInput, out var newWDTI) && CurrentWDTFileDataID != newWDTI && Services.CASC.FileExists(newWDTI))
+                    if (uint.TryParse(WDTFDIDInput, out var newWDTI) && sceneManager.CurrentWDTFileDataID != newWDTI && Services.CASC.FileExists(newWDTI))
                     {
-                        loadedTiles.Clear();
-
-                        lock (sceneObjectLock)
-                            sceneObjects.Clear();
-
-                        CurrentWDTFileDataID = newWDTI;
-                        CurrentWDT = Cache.GetOrLoadWDT(CurrentWDTFileDataID);
+                        sceneManager.LoadWDT(newWDTI);
                     }
                 }
                 ImGui.End();
 
-                if (sceneLoaded)
+                if (sceneManager.SceneLoaded)
                 {
                     ImGui.Begin("3D debug");
 
+                    var renderADT = sceneManager.RenderADT;
                     ImGui.Checkbox("Render ADT", ref renderADT);
-                    ImGui.Checkbox("Render WMO", ref renderWMO);
-                    ImGui.Checkbox("Render M2", ref renderM2);
+                    sceneManager.RenderADT = renderADT;
 
-                    if (selectedObject != null)
+                    var renderWMO = sceneManager.RenderWMO;
+                    ImGui.Checkbox("Render WMO", ref renderWMO);
+                    sceneManager.RenderWMO = renderWMO;
+
+                    var renderM2 = sceneManager.RenderM2;
+                    ImGui.Checkbox("Render M2", ref renderM2);
+                    sceneManager.RenderM2 = renderM2;
+
+                    if (sceneManager.SelectedObject != null)
                     {
-                        ImGui.Text("Selected Object: " + selectedObject.FileDataId);
+                        ImGui.Text("Selected Object: " + sceneManager.SelectedObject.FileDataId);
 
                         if (ImGui.Button("Deselect"))
                         {
-                            selectedObject.IsSelected = false;
-                            selectedObject = null;
+                            sceneManager.SelectedObject.IsSelected = false;
+                            sceneManager.SelectedObject = null;
                         }
                     }
 
+                    var showBoundingBoxes = sceneManager.ShowBoundingBoxes;
                     ImGui.Checkbox("Show Bounding Boxes", ref showBoundingBoxes);
+                    sceneManager.ShowBoundingBoxes = showBoundingBoxes;
+
+                    var showBoundingSpheres = sceneManager.ShowBoundingSpheres;
                     ImGui.Checkbox("Show Bounding Spheres", ref showBoundingSpheres);
+                    sceneManager.ShowBoundingSpheres = showBoundingSpheres;
 
                     var newPos = activeCamera.Position;
                     ImGui.DragFloat3("Camera position", ref newPos);
@@ -447,20 +349,18 @@ namespace WoWViewer.NET
                     var roll = activeCamera.Roll;
                     ImGui.DragFloat("Camera roll", ref roll);
                     activeCamera.Roll = roll;
-                   
-                    var lightDir = lightDirection;
+
+                    var lightDir = sceneManager.LightDirection;
                     ImGui.DragFloat3("Light direction", ref lightDir);
-                    lightDirection = lightDir;
+                    sceneManager.LightDirection = lightDir;
 
-                    ImGui.Text(sceneObjects.Count.ToString() + " loaded objects (" + sceneObjects.Count(x => x is M2Container).ToString() + " M2, " + sceneObjects.Count(x => x is WMOContainer).ToString() + " WMO, " + sceneObjects.Count(x => x is ADTContainer).ToString() + " ADT)");
-
-                    ImGui.Text("Current ADT: " + GetTileFromPosition(activeCamera.Position).ToString());
+                    ImGui.Text(sceneManager.SceneObjects.Count.ToString() + " loaded objects (" + sceneManager.SceneObjects.Count(x => x is M2Container).ToString() + " M2, " + sceneManager.SceneObjects.Count(x => x is WMOContainer).ToString() + " WMO, " + sceneManager.SceneObjects.Count(x => x is ADTContainer).ToString() + " ADT)");
                     ImGui.Text("RAM usage: " + (GC.GetTotalMemory(false) / 1024 / 1024).ToString() + " MB");
 
                     var i = 0;
                     if (ImGui.CollapsingHeader("Loaded WMOs"))
                     {
-                        foreach (var sceneObject in sceneObjects.Where(x => x is WMOContainer))
+                        foreach (var sceneObject in sceneManager.SceneObjects.Where(x => x is WMOContainer))
                         {
                             var wmoContainer = (WMOContainer)sceneObject;
                             var wmoString = "WMO #" + i + " FDID " + wmoContainer.FileDataId.ToString();
@@ -487,7 +387,7 @@ namespace WoWViewer.NET
                     i = 0;
                     if (ImGui.CollapsingHeader("Loaded M2s"))
                     {
-                        foreach (var sceneObject in sceneObjects.Where(x => x is M2Container))
+                        foreach (var sceneObject in sceneManager.SceneObjects.Where(x => x is M2Container))
                         {
                             var m2Container = (M2Container)sceneObject;
                             if (ImGui.CollapsingHeader("M2 #" + i + " FDID " + m2Container.FileDataId.ToString()))
@@ -511,7 +411,12 @@ namespace WoWViewer.NET
                     ImGui.End();
                 }
 
-                RenderScene();
+                sceneManager.RenderScene(activeCamera, out bool renderGizmoWasUsing, out bool renderGizmoWasOver);
+                RenderGizmo();
+                sceneManager.RenderDebug(activeCamera, out bool debugGizmoWasUsing, out bool debugGizmoWasOver);
+
+                gizmoWasUsing = renderGizmoWasUsing || debugGizmoWasUsing;
+                gizmoWasOver = renderGizmoWasOver || debugGizmoWasOver;
 
                 imGuiController.Render();
 
@@ -521,7 +426,7 @@ namespace WoWViewer.NET
             window.Closing += () =>
             {
                 shaderManager.Dispose();
-                debugRenderer?.Dispose();
+                sceneManager?.Dispose();
                 imGuiController?.Dispose();
                 inputContext?.Dispose();
                 gl?.Dispose();
@@ -532,434 +437,71 @@ namespace WoWViewer.NET
             window.Dispose();
         }
 
-        private static void PerformRaycast(float mouseX, float mouseY)
+        private static unsafe void RenderGizmo()
         {
-            var ray = activeCamera.GetRayFromScreen(mouseX, mouseY, window.Size.X, window.Size.Y);
+            if (sceneManager.SelectedObject == null)
+                return;
 
-            Container3D? closestObject = null;
-            float closestDistance = float.MaxValue;
+            var windowPos = new Vector2(0, 0);
+            var windowSize = new Vector2(window.Size.X, window.Size.Y);
 
-            lock (sceneObjectLock)
+            ImGuizmo.SetDrawlist(ImGui.GetForegroundDrawList());
+            ImGuizmo.Enable(true);
+            ImGuizmo.SetOrthographic(false);
+            ImGuizmo.SetRect(windowPos.X, windowPos.Y, windowSize.X, windowSize.Y);
+
+            var view = activeCamera.GetViewMatrix();
+            view *= Matrix4x4.CreateRotationZ(MathF.PI / 180f * 180f);
+            var proj = activeCamera.GetProjectionMatrix();
+
+            var sceneObject = sceneManager.SelectedObject;
+            var transform = Matrix4x4.CreateScale(sceneObject.Scale);
+            transform *= Matrix4x4.CreateRotationX(MathF.PI / 180f * sceneObject.Rotation.X);
+            transform *= Matrix4x4.CreateRotationY(MathF.PI / 180f * -sceneObject.Rotation.Z);
+            transform *= Matrix4x4.CreateRotationZ(MathF.PI / 180f * (sceneObject.Rotation.Y - 270f));
+            transform *= Matrix4x4.CreateTranslation(sceneObject.Position.X, sceneObject.Position.Z * -1, sceneObject.Position.Y);
+            transform *= Matrix4x4.CreateRotationZ(MathF.PI / 180f * -270f);
+
+            ImGuizmo.DrawGrid(ref view, ref proj, ref transform, 10);
+            ImGuizmo.DrawCubes(ref view, ref proj, ref transform, 1);
+
+            ImGuizmo.PushID(0);
+
+            if (ImGuizmo.Manipulate(ref view, ref proj, currentGizmoOperation, ImGuizmoMode.Local, ref transform))
             {
-                int testCount = 0;
-                foreach (var sceneObject in sceneObjects)
+                var inversePostRot = Matrix4x4.CreateRotationZ(MathF.PI / 180f * 270f);
+                var unrotated = transform * inversePostRot;
+
+                if (currentGizmoOperation == ImGuizmoOperation.Translate)
                 {
-                    // Skip ADT for now
-                    if (sceneObject is ADTContainer)
-                        continue;
-
-                    // dont raycast against WMOs if they arent rendering
-                    if (!renderWMO && sceneObject is WMOContainer)
-                        continue;
-
-
-                    // dont raycast against M2s if they arent rendering
-                    if (!renderM2 && sceneObject is M2Container)
-                        continue;
-
-                    testCount++;
-
-                    var sphere = sceneObject.GetBoundingSphere();
-                    if (sphere.HasValue)
+                    var newPosition = new Vector3(unrotated.M41, unrotated.M43, -unrotated.M42);
+                    sceneObject.Position = newPosition;
+                }
+                else if (currentGizmoOperation == ImGuizmoOperation.Rotate)
+                {
+                    if (Matrix4x4.Decompose(unrotated, out _, out Quaternion rotation, out _))
                     {
-                        if (IntersectionTests.RayIntersectsSphere(ray, sphere.Value, out float sphereDistance))
-                        {
-                            if (sphereDistance < closestDistance)
-                            {
-                                var box = sceneObject.GetBoundingBox();
-                                if (box.HasValue && IntersectionTests.RayIntersectsBox(ray, box.Value, out float boxDistance))
-                                {
-                                    if (boxDistance < closestDistance)
-                                    {
-                                        closestDistance = boxDistance;
-                                        closestObject = sceneObject;
-                                    }
-                                }
-                                else if (!box.HasValue)
-                                {
-                                    closestDistance = sphereDistance;
-                                    closestObject = sceneObject;
-                                }
-                            }
-                        }
+                        var euler = QuaternionToEuler(rotation);
+                        var xRotationDegrees = euler.X * (180f / MathF.PI);
+                        var yRotationDegrees = euler.Y * (180f / MathF.PI);
+                        var zRotationDegrees = euler.Z * (180f / MathF.PI);
+                        sceneObject.Rotation = new Vector3(
+                            xRotationDegrees,
+                            zRotationDegrees + 270f,
+                            -yRotationDegrees
+                        );
                     }
+                }
+                else if (currentGizmoOperation == ImGuizmoOperation.Scale)
+                {
+                    var scaleX = new Vector3(unrotated.M11, unrotated.M12, unrotated.M13).Length();
+                    var scaleY = new Vector3(unrotated.M21, unrotated.M22, unrotated.M23).Length();
+                    var scaleZ = new Vector3(unrotated.M31, unrotated.M32, unrotated.M33).Length();
+                    sceneObject.Scale = (scaleX + scaleY + scaleZ) / 3f;
                 }
             }
 
-            //deselect current
-            selectedObject?.IsSelected = false;
-
-            //select
-            selectedObject = closestObject;
-            selectedObject?.IsSelected = true;
-
-        }
-
-        private static unsafe void RenderScene()
-        {
-            var m2ProjLocation = gl.GetUniformLocation(m2ShaderProgram, "projection_matrix");
-            var m2ViewLocation = gl.GetUniformLocation(m2ShaderProgram, "view_matrix");
-            var m2ModelLocation = gl.GetUniformLocation(m2ShaderProgram, "model_matrix");
-
-            var wmoProjLocation = gl.GetUniformLocation(wmoShaderProgram, "projection_matrix");
-            var wmoViewLocation = gl.GetUniformLocation(wmoShaderProgram, "view_matrix");
-            var wmoModelLocation = gl.GetUniformLocation(wmoShaderProgram, "model_matrix");
-            var wmoVertexShaderIDLocation = gl.GetUniformLocation(wmoShaderProgram, "vertexShader");
-            var wmoPixelShaderIDLocation = gl.GetUniformLocation(wmoShaderProgram, "pixelShader");
-
-            var adtProjLocation = gl.GetUniformLocation(adtShaderProgram, "projection_matrix");
-            var adtRotLocation = gl.GetUniformLocation(adtShaderProgram, "rotation_matrix");
-            var adtModelLocation = gl.GetUniformLocation(adtShaderProgram, "model_matrix");
-
-
-            var adtLightDirectionLocation = gl.GetUniformLocation(adtShaderProgram, "lightDirection");
-            var m2LightDirectionLocation = gl.GetUniformLocation(m2ShaderProgram, "lightDirection");
-            var wmoLightDirectionLocation = gl.GetUniformLocation(wmoShaderProgram, "lightDirection");
-
-            var heightScaleUniforms = new int[8];
-            for (int i = 0; i < 8; i++)
-                heightScaleUniforms[i] = gl.GetUniformLocation(adtShaderProgram, $"heightScales[{i}]");
-
-            var heightOffsetUniforms = new int[8];
-            for (int i = 0; i < 8; i++)
-                heightOffsetUniforms[i] = gl.GetUniformLocation(adtShaderProgram, $"heightOffsets[{i}]");
-
-            var layerScaleUniforms = new int[8];
-            for (int i = 0; i < 8; i++)
-                layerScaleUniforms[i] = gl.GetUniformLocation(adtShaderProgram, $"layerScales[{i}]");
-
-            var alphaLayerUniforms = new int[2];
-            for (int i = 0; i < 2; i++)
-                alphaLayerUniforms[i] = gl.GetUniformLocation(adtShaderProgram, $"alphaLayers[{i}]");
-
-            var diffuseLayerUniforms = new int[8];
-            for (int i = 0; i < 8; i++)
-                diffuseLayerUniforms[i] = gl.GetUniformLocation(adtShaderProgram, $"diffuseLayers[{i}]");
-
-            var heightLayerUniforms = new int[8];
-            for (int i = 0; i < 8; i++)
-                heightLayerUniforms[i] = gl.GetUniformLocation(adtShaderProgram, $"heightLayers[{i}]");
-
-            var m2AlphaRefLoc = gl.GetUniformLocation(m2ShaderProgram, "alphaRef");
-            var wmoAlphaRefLoc = gl.GetUniformLocation(wmoShaderProgram, "alphaRef");
-
-            var projectionMatrix = activeCamera.GetProjectionMatrix();
-
-            foreach (var sceneObject in sceneObjects)
-            {
-                if (sceneObject is M2Container activeM2)
-                {
-                    if (!renderM2 && !activeM2.forceRender)
-                        continue;
-
-                    if (activeM2.FileDataId == 2061670)
-                    {
-                        activeM2.FileDataId = 2061670;
-                        activeM2.Rotation = new Vector3(activeM2.Rotation.X, activeM2.Rotation.Y * -1, activeM2.Rotation.Z);
-                        activeM2.Scale = 1f;
-                    }
-
-                    var m2 = Cache.GetOrLoadM2(gl, activeM2.FileDataId, m2ShaderProgram, activeM2.ParentFileDataId);
-
-                    gl.UseProgram(m2ShaderProgram);
-
-                    gl.UniformMatrix4(m2ProjLocation, 1, false, (float*)&projectionMatrix);
-
-                    var viewMatrix = activeCamera.GetViewMatrix();
-                    viewMatrix *= Matrix4x4.CreateRotationZ(MathF.PI / 180f * 180f);
-
-                    gl.UniformMatrix4(m2ViewLocation, 1, false, (float*)&viewMatrix);
-
-                    // Model matrix contains position, rotation and scale
-                    var modelMatrix = Matrix4x4.CreateScale(sceneObject.Scale);
-
-                    // Apply ADT rotation
-                    modelMatrix *= Matrix4x4.CreateRotationZ(MathF.PI / 180f * (sceneObject.Rotation.Y - 270f));
-                    //modelMatrix *= Matrix4x4.CreateRotationX(MathF.PI / 180f * (-wmoContainer.Rotation.X));
-                    //modelMatrix *= Matrix4x4.CreateRotationY(MathF.PI / 180f * (wmoContainer.Rotation.Z - 90f));
-
-                    modelMatrix *= Matrix4x4.CreateTranslation(sceneObject.Position.X, sceneObject.Position.Z * -1, sceneObject.Position.Y);
-
-                    // Post-transform rotation
-                    modelMatrix *= Matrix4x4.CreateRotationZ(MathF.PI / 180f * -270f);
-
-                    gl.UniformMatrix4(m2ModelLocation, 1, false, (float*)&modelMatrix);
-
-                    gl.Uniform3(m2LightDirectionLocation, lightDirection.X, lightDirection.Y, lightDirection.Z);
-
-                    gl.ActiveTexture(TextureUnit.Texture0);
-
-                    gl.BindVertexArray(m2.vao);
-
-                    for (var i = 0; i < m2.submeshes.Length; i++)
-                    {
-                        var submesh = m2.submeshes[i];
-                        if (!activeM2.EnabledGeosets[i])
-                            continue;
-
-                        SwitchBlendMode((int)submesh.blendType, gl, m2AlphaRefLoc);
-
-                        gl.BindTexture(TextureTarget.Texture2D, submesh.material);
-                        gl.DrawElements(PrimitiveType.Triangles, submesh.numFaces, DrawElementsType.UnsignedInt, (void*)(submesh.firstFace * 4));
-                        gl.BindTexture(TextureTarget.Texture2D, 0);
-                    }
-
-#if DEBUG
-                    var err = gl.GetError();
-                    if (err != GLEnum.NoError)
-                        Console.WriteLine("M2 render GL Error: " + err);
-#endif
-                }
-                else if (sceneObject is WMOContainer wmoContainer)
-                {
-                    if (!renderWMO)
-                        continue;
-
-                    var wmo = Cache.GetOrLoadWMO(gl, sceneObject.FileDataId, wmoShaderProgram, sceneObject.ParentFileDataId);
-
-                    gl.UseProgram(wmoShaderProgram);
-
-                    gl.UniformMatrix4(wmoProjLocation, 1, false, (float*)&projectionMatrix);
-
-                    var viewMatrix = activeCamera.GetViewMatrix();
-                    viewMatrix *= Matrix4x4.CreateRotationZ(MathF.PI / 180f * 180f);
-
-                    gl.UniformMatrix4(wmoViewLocation, 1, false, (float*)&viewMatrix);
-
-                    // Model matrix contains position, rotation and scale
-                    var modelMatrix = Matrix4x4.CreateScale(sceneObject.Scale);
-
-                    // Apply rotations on all 3 axes
-                    modelMatrix *= Matrix4x4.CreateRotationX(MathF.PI / 180f * wmoContainer.Rotation.X);
-                    modelMatrix *= Matrix4x4.CreateRotationY(MathF.PI / 180f * -wmoContainer.Rotation.Z);
-                    modelMatrix *= Matrix4x4.CreateRotationZ(MathF.PI / 180f * (wmoContainer.Rotation.Y - 270f));
-
-                    modelMatrix *= Matrix4x4.CreateTranslation(wmoContainer.Position.X, wmoContainer.Position.Z * -1, wmoContainer.Position.Y);
-
-                    // Post-transform rotation
-                    modelMatrix *= Matrix4x4.CreateRotationZ(MathF.PI / 180f * -270f);
-
-                    gl.UniformMatrix4(wmoModelLocation, 1, false, (float*)&modelMatrix);
-
-                    gl.Uniform3(wmoLightDirectionLocation, lightDirection.X, lightDirection.Y, lightDirection.Z);
-
-                    for (var j = 0; j < wmo.wmoRenderBatch.Length; j++)
-                    {
-                        if (wmo.groupBatches[wmo.wmoRenderBatch[j].groupID].vao == 0)
-                            continue;
-
-                        var firstFace = wmo.wmoRenderBatch[j].firstFace;
-                        var numFaces = wmo.wmoRenderBatch[j].numFaces;
-
-                        gl.BindVertexArray(wmo.groupBatches[wmo.wmoRenderBatch[j].groupID].vao);
-
-                        gl.Uniform1(wmoVertexShaderIDLocation, (float)ShaderEnums.WMOShaders[(int)wmo.wmoRenderBatch[j].shader].VertexShader);
-                        gl.Uniform1(wmoPixelShaderIDLocation, (float)ShaderEnums.WMOShaders[(int)wmo.wmoRenderBatch[j].shader].PixelShader);
-
-                        SwitchBlendMode((int)wmo.wmoRenderBatch[j].blendType, gl, wmoAlphaRefLoc);
-
-                        for (var m = 0; m < wmo.wmoRenderBatch[j].materialID.Length; m++)
-                        {
-                            gl.ActiveTexture(TextureUnit.Texture0 + m);
-                            if (wmo.wmoRenderBatch[j].materialID[m] == -1)
-                                gl.BindTexture(TextureTarget.Texture2D, defaultTextureID);
-                            else
-                                gl.BindTexture(TextureTarget.Texture2D, (uint)wmo.wmoRenderBatch[j].materialID[m]);
-                        }
-
-                        gl.DrawElements(PrimitiveType.Triangles, numFaces, DrawElementsType.UnsignedShort, (void*)(firstFace * 2));
-
-                        for (var m = 0; m < wmo.wmoRenderBatch[j].materialID.Length; m++)
-                        {
-                            gl.ActiveTexture(TextureUnit.Texture0 + m);
-                            gl.BindTexture(TextureTarget.Texture2D, 0);
-                        }
-                    }
-#if DEBUG
-                    var err = gl.GetError();
-                    if (err != GLEnum.NoError)
-                        Console.WriteLine("WMO render GL Error: " + err);
-#endif
-                }
-                else if (sceneObject is ADTContainer adt)
-                {
-                    if (!renderADT)
-                        continue;
-
-                    gl.UseProgram(adtShaderProgram);
-
-                    var modelviewMatrix = Matrix4x4.CreateRotationZ(MathF.PI / 180f * 180f);
-                    gl.UniformMatrix4(adtModelLocation, 1, false, (float*)&modelviewMatrix);
-
-                    var rotationMatrix = activeCamera.GetViewMatrix();
-                    gl.UniformMatrix4(adtRotLocation, 1, false, (float*)&rotationMatrix);
-                    gl.UniformMatrix4(adtProjLocation, 1, false, (float*)&projectionMatrix);
-
-                    gl.Uniform3(adtLightDirectionLocation, lightDirection.X, lightDirection.Y, lightDirection.Z);
-
-                    gl.BindVertexArray(adt.Terrain.vao);
-                    gl.Disable(EnableCap.Blend);
-
-                    for (int c = 0; c < 256; c++)
-                    {
-                        var batch = adt.Terrain.renderBatches[c];
-
-                        for (int j = 0; j < 2; j++)
-                        {
-                            gl.Uniform1(alphaLayerUniforms[j], j);
-                            gl.ActiveTexture(TextureUnit.Texture0 + j);
-                            gl.BindTexture(TextureTarget.Texture2D, (batch.alphaMaterialID[j]) == -1 ? defaultTextureID : (uint)batch.alphaMaterialID[j]);
-                        }
-
-                        for (int j = 0; j < 8; j++)
-                        {
-                            gl.Uniform1(heightScaleUniforms[j], batch.heightScales[j]);
-                            gl.Uniform1(heightOffsetUniforms[j], batch.heightOffsets[j]);
-                            gl.Uniform1(layerScaleUniforms[j], batch.scales[j]);
-
-                            gl.Uniform1(diffuseLayerUniforms[j], j + 7);
-                            gl.ActiveTexture(TextureUnit.Texture7 + j);
-                            gl.BindTexture(TextureTarget.Texture2D, (batch.materialID[j]) == -1 ? defaultTextureID : (uint)batch.materialID[j]);
-                            gl.Uniform1(heightLayerUniforms[j], j + 15);
-                            gl.ActiveTexture(TextureUnit.Texture15 + j);
-                            gl.BindTexture(TextureTarget.Texture2D, (batch.heightMaterialIDs[j]) == -1 ? defaultTextureID : (uint)batch.heightMaterialIDs[j]);
-                        }
-
-                        gl.DrawElements(PrimitiveType.Triangles, (uint)((c + 1) * 768) - (uint)c * 768, DrawElementsType.UnsignedInt, (void*)((c * 768) * 4));
-
-                        for (int j = 0; j < 8; j++)
-                        {
-                            gl.ActiveTexture(TextureUnit.Texture0 + j);
-                            gl.BindTexture(TextureTarget.Texture2D, 0);
-                            gl.ActiveTexture(TextureUnit.Texture7 + j);
-                            gl.BindTexture(TextureTarget.Texture2D, 0);
-                            gl.ActiveTexture(TextureUnit.Texture15 + j);
-                            gl.BindTexture(TextureTarget.Texture2D, 0);
-                        }
-                    }
-
-#if DEBUG
-                    var err = gl.GetError();
-                    if (err != GLEnum.NoError)
-                        Console.WriteLine("ADT render GL Error: " + err);
-#endif
-                }
-            }
-
-            gl.BindVertexArray(0);
-
-            // bounding debug
-            debugRenderer.Clear();
-
-            gizmoWasUsing = false;
-            gizmoWasOver = false;
-
-            lock (sceneObjectLock)
-            {
-                foreach (var sceneObject in sceneObjects)
-                {
-                    // dont render debug render adt 
-                    if (sceneObject is ADTContainer)
-                        continue;
-
-                    if (!renderWMO && sceneObject is WMOContainer && !sceneObject.IsSelected)
-                        continue;
-
-                    if (!renderM2 && sceneObject is M2Container && !sceneObject.IsSelected)
-                        continue;
-
-                    var color = sceneObject.IsSelected ? new Vector4(0, 1, 0, 1) : new Vector4(1, 1, 0, 1); // geen if selected, yellow if not
-
-                    if (showBoundingBoxes || sceneObject.IsSelected)
-                    {
-                        var box = sceneObject.GetBoundingBox();
-                        if (box.HasValue)
-                        {
-                            debugRenderer.DrawBox(box.Value.Min, box.Value.Max, color);
-                        }
-                    }
-
-                    if (showBoundingSpheres)
-                    {
-                        var sphere = sceneObject.GetBoundingSphere();
-                        if (sphere.HasValue)
-                        {
-                            debugRenderer.DrawSphere(sphere.Value.Center, sphere.Value.Radius, color);
-                        }
-                    }
-
-                    if (sceneObject.IsSelected)
-                    {
-                        var windowPos = new Vector2(0, 0);
-                        var windowSize = new Vector2(window.Size.X, window.Size.Y);
-
-                        ImGuizmo.SetDrawlist(ImGui.GetForegroundDrawList());
-                        ImGuizmo.Enable(true);
-                        ImGuizmo.SetOrthographic(false);
-                        ImGuizmo.SetRect(windowPos.X, windowPos.Y, windowSize.X, windowSize.Y);
-
-                        var view = activeCamera.GetViewMatrix();
-                        view *= Matrix4x4.CreateRotationZ(MathF.PI / 180f * 180f);
-                        var proj = activeCamera.GetProjectionMatrix();
-
-                        var transform = Matrix4x4.CreateScale(sceneObject.Scale);
-                        transform *= Matrix4x4.CreateRotationX(MathF.PI / 180f * sceneObject.Rotation.X);
-                        transform *= Matrix4x4.CreateRotationY(MathF.PI / 180f * -sceneObject.Rotation.Z);
-                        transform *= Matrix4x4.CreateRotationZ(MathF.PI / 180f * (sceneObject.Rotation.Y - 270f));
-                        transform *= Matrix4x4.CreateTranslation(sceneObject.Position.X, sceneObject.Position.Z * -1, sceneObject.Position.Y);
-                        transform *= Matrix4x4.CreateRotationZ(MathF.PI / 180f * -270f);
-
-                        ImGuizmo.DrawGrid(ref view, ref proj, ref transform, 10);
-                        ImGuizmo.DrawCubes(ref view, ref proj, ref transform, 1);
-
-                        ImGuizmo.PushID(0);
-
-                        if (ImGuizmo.Manipulate(ref view, ref proj, currentGizmoOperation, ImGuizmoMode.Local, ref transform))
-                        {
-                            var inversePostRot = Matrix4x4.CreateRotationZ(MathF.PI / 180f * 270f);
-                            var unrotated = transform * inversePostRot;
-
-                            if (currentGizmoOperation == ImGuizmoOperation.Translate)
-                            {
-                                var newPosition = new Vector3(unrotated.M41, unrotated.M43, -unrotated.M42);
-                                sceneObject.Position = newPosition;
-                            }
-                            else if (currentGizmoOperation == ImGuizmoOperation.Rotate)
-                            {
-                                if (Matrix4x4.Decompose(unrotated, out Vector3 scale, out Quaternion rotation, out Vector3 translation))
-                                {
-                                    var euler = QuaternionToEuler(rotation);
-                                    var xRotationDegrees = euler.X * (180f / MathF.PI);
-                                    var yRotationDegrees = euler.Y * (180f / MathF.PI);
-                                    var zRotationDegrees = euler.Z * (180f / MathF.PI);
-                                    sceneObject.Rotation = new Vector3(
-                                        xRotationDegrees,
-                                        zRotationDegrees + 270f,
-                                        -yRotationDegrees
-                                    );
-                                }
-                            }
-                            else if (currentGizmoOperation == ImGuizmoOperation.Scale)
-                            {
-                                // WoW doesn't support per axis scaling, so average all three axes
-                                var scaleX = new Vector3(unrotated.M11, unrotated.M12, unrotated.M13).Length();
-                                var scaleY = new Vector3(unrotated.M21, unrotated.M22, unrotated.M23).Length();
-                                var scaleZ = new Vector3(unrotated.M31, unrotated.M32, unrotated.M33).Length();
-                                sceneObject.Scale = (scaleX + scaleY + scaleZ) / 3f;
-                            }
-                        }
-
-                        gizmoWasUsing = ImGuizmo.IsUsing();
-                        gizmoWasOver = ImGuizmo.IsOver();
-
-                        ImGuizmo.PopID();
-                    }
-                }
-            }
-
-            var debugViewMatrix = activeCamera.GetViewMatrix();
-            debugViewMatrix *= Matrix4x4.CreateRotationZ(MathF.PI / 180f * 180f);
-            debugRenderer.Render(projectionMatrix, debugViewMatrix);
+            ImGuizmo.PopID();
         }
 
         private static Vector3 QuaternionToEuler(Quaternion q)
@@ -981,208 +523,6 @@ namespace WoWViewer.NET
             euler.Z = MathF.Atan2(siny_cosp, cosy_cosp);
 
             return euler;
-        }
-
-        private static (byte x, byte y) GetTileFromPosition(Vector3 position)
-        {
-            const float tileSize = 533.33333f;
-            const int mapCenter = 32;
-
-            // todo: this is not super correct but close enough for 3x3 load, check math with minimap tool at some point
-            int tileX = mapCenter - (int)Math.Floor(position.Y / tileSize);
-            int tileY = mapCenter - (int)Math.Floor(position.X / tileSize);
-
-            tileX = Math.Clamp(tileX, 0, 63);
-            tileY = Math.Clamp(tileY, 0, 63);
-
-            return ((byte)tileX, (byte)tileY);
-        }
-
-        private static void UpdateTilesByCameraPos()
-        {
-            if (!cascLoaded)
-                return;
-
-            if (CurrentWDT == null)
-                return;
-
-            var (x, y) = GetTileFromPosition(activeCamera.Position);
-
-            var usedTiles = new List<MapTile>();
-
-            for (int xOffset = -1; xOffset <= 1; xOffset++)
-            {
-                for (int yOffset = -1; yOffset <= 1; yOffset++)
-                {
-                    byte tileX = (byte)(x + xOffset);
-                    byte tileY = (byte)(y + yOffset);
-
-                    // oob check
-                    if (tileX < 0 || tileX > 63 || tileY < 0 || tileY > 63)
-                        continue;
-
-                    // tile exists in wdt check
-                    if (!CurrentWDT.Value.tiles.Contains((tileX, tileY)))
-                        continue;
-
-                    var mapTile = new MapTile
-                    {
-                        tileX = tileX,
-                        tileY = tileY,
-                        wdtFileDataID = CurrentWDTFileDataID
-                    };
-
-                    usedTiles.Add(mapTile);
-
-                    if (!loadedTiles.Contains(mapTile) && !tilesToLoad.Contains(mapTile))
-                    {
-                        Console.WriteLine($"Queuing tile {mapTile.tileX},{mapTile.tileY} for load (3x3 around camera, which is in tile {x},{y})");
-                        tilesToLoad.Enqueue(mapTile);
-                        totalTilesToLoad++;
-                    }
-                }
-            }
-
-            // Unload tiles that are no longer in the 3x3 around the camera
-            foreach (var tile in loadedTiles)
-            {
-                if (!usedTiles.Contains(tile))
-                {
-                    Console.WriteLine($"Releasing tile {tile.tileX},{tile.tileY} as it's no longer in the 3x3 around the camera");
-                    loadedTiles.Remove(tile);
-
-                    lock (sceneObjectLock)
-                    {
-                        // Not a fan of using LINQ here, probably need a better way for this
-                        var adtToRemove = sceneObjects.FirstOrDefault(x => x is ADTContainer adt && adt.mapTile.wdtFileDataID == tile.wdtFileDataID && adt.mapTile.tileX == tile.tileX && adt.mapTile.tileY == tile.tileY) as ADTContainer;
-                        if (adtToRemove != null)
-                        {
-                            sceneObjects.Remove(adtToRemove);
-                            Cache.ReleaseADT(gl, adtToRemove.mapTile, adtToRemove.mapTile.wdtFileDataID);
-
-                            List<WMOContainer> wmosToRemove = sceneObjects.Where(x => x is WMOContainer wmo && wmo.ParentFileDataId == adtToRemove.Terrain.rootADTFileDataID).Select(x => (WMOContainer)x).ToList();
-                            foreach (var wmo in wmosToRemove)
-                            {
-                                if (uuidUsers.TryGetValue(wmo.UniqueID, out var count))
-                                {
-                                    if (count > 1)
-                                    {
-                                        uuidUsers[wmo.UniqueID] = count - 1;
-                                    }
-                                    else
-                                    {
-                                        sceneObjects.Remove(wmo);
-                                        Cache.ReleaseWMO(gl, wmo.FileDataId, wmo.ParentFileDataId);
-                                        uuidUsers.Remove(wmo.UniqueID);
-                                    }
-                                }
-
-                            }
-
-                            List<M2Container> m2sToRemove = sceneObjects.Where(x => x is M2Container m2 && m2.ParentFileDataId == adtToRemove.Terrain.rootADTFileDataID).Select(x => (M2Container)x).ToList();
-                            foreach (var m2 in m2sToRemove)
-                            {
-                                sceneObjects.Remove(m2);
-                                Cache.ReleaseM2(gl, m2.FileDataId, m2.ParentFileDataId);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        private static unsafe uint MakeDefaultTexture()
-        {
-            var defaultTexture = gl.GenTexture();
-            gl.BindTexture(TextureTarget.Texture2D, defaultTexture);
-            byte[] fill = [0, 0, 0, 0];
-            fixed (byte* fillPtr = fill)
-            {
-                gl.TexImage2D(TextureTarget.Texture2D, 0, InternalFormat.Rgba8, 1, 1, 0, PixelFormat.Rgba, PixelType.UnsignedByte, fillPtr);
-            }
-
-            gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Linear);
-            gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Linear);
-            gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)TextureWrapMode.Repeat);
-            gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, (int)TextureWrapMode.Repeat);
-
-            return defaultTexture;
-        }
-        private static void SwitchBlendMode(int blendType, GL gl, int alphaRefLoc)
-        {
-            switch (blendType)
-            {
-                case 0: // GxBlend_Opaque
-                    gl.Disable(EnableCap.Blend);
-                    gl.Uniform1(alphaRefLoc, -1.0f);
-                    break;
-                case 1: // GxBlend_AlphaKey
-                    gl.Disable(EnableCap.Blend);
-                    gl.Uniform1(alphaRefLoc, 0.90393700787f);
-                    break;
-                case 2: // GxBlend_Alpha
-                    gl.Enable(EnableCap.Blend);
-                    gl.Uniform1(alphaRefLoc, -1.0f);
-                    gl.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
-                    break;
-                case 3: // GxBlend_Add
-                    gl.Enable(EnableCap.Blend);
-                    gl.Uniform1(alphaRefLoc, -1.0f);
-                    gl.BlendFuncSeparate(BlendingFactor.SrcAlpha, BlendingFactor.One, BlendingFactor.Zero, BlendingFactor.One);
-                    break;
-                case 4: // GxBlend_Mod
-                    gl.Enable(EnableCap.Blend);
-                    gl.Uniform1(alphaRefLoc, -1.0f);
-                    gl.BlendFuncSeparate(BlendingFactor.DstColor, BlendingFactor.Zero, BlendingFactor.DstAlpha, BlendingFactor.Zero);
-                    break;
-                case 5: // GxBlend_Mod2x
-                    gl.Enable(EnableCap.Blend);
-                    gl.Uniform1(alphaRefLoc, -1.0f);
-                    gl.BlendFuncSeparate(BlendingFactor.DstColor, BlendingFactor.SrcColor, BlendingFactor.DstAlpha, BlendingFactor.SrcAlpha);
-                    break;
-                case 6: // GxBlend_ModAdd
-                    gl.Enable(EnableCap.Blend);
-                    gl.Uniform1(alphaRefLoc, -1.0f);
-                    gl.BlendFuncSeparate(BlendingFactor.DstColor, BlendingFactor.One, BlendingFactor.DstAlpha, BlendingFactor.One);
-                    break;
-                case 7: // GxBlend_InvSrcAlphaAdd
-                    gl.Enable(EnableCap.Blend);
-                    gl.Uniform1(alphaRefLoc, -1.0f);
-                    gl.BlendFuncSeparate(BlendingFactor.OneMinusSrcAlpha, BlendingFactor.One, BlendingFactor.OneMinusSrcAlpha, BlendingFactor.One);
-                    break;
-                case 8: // GxBlend_InvSrcAlphaOpaque
-                    gl.Enable(EnableCap.Blend);
-                    gl.Uniform1(alphaRefLoc, -1.0f);
-                    gl.BlendFuncSeparate(BlendingFactor.OneMinusSrcAlpha, BlendingFactor.Zero, BlendingFactor.OneMinusSrcAlpha, BlendingFactor.Zero);
-                    break;
-                case 9: // GxBlend_SrcAlphaOpaque
-                    gl.Enable(EnableCap.Blend);
-                    gl.Uniform1(alphaRefLoc, -1.0f);
-                    gl.BlendFuncSeparate(BlendingFactor.SrcAlpha, BlendingFactor.Zero, BlendingFactor.SrcAlpha, BlendingFactor.Zero);
-                    break;
-                case 10: // GxBlend_NoAlphaAdd
-                    gl.Enable(EnableCap.Blend);
-                    gl.Uniform1(alphaRefLoc, -1.0f);
-                    gl.BlendFuncSeparate(BlendingFactor.One, BlendingFactor.One, BlendingFactor.Zero, BlendingFactor.One);
-                    break;
-                case 11: // GxBlend_ConstantAlpha
-                    gl.Enable(EnableCap.Blend);
-                    gl.Uniform1(alphaRefLoc, -1.0f);
-                    gl.BlendFuncSeparate(BlendingFactor.ConstantAlpha, BlendingFactor.OneMinusConstantAlpha, BlendingFactor.ConstantAlpha, BlendingFactor.OneMinusConstantAlpha);
-                    break;
-                case 12: // GxBlend_Screen
-                    gl.Enable(EnableCap.Blend);
-                    gl.Uniform1(alphaRefLoc, -1.0f);
-                    gl.BlendFuncSeparate(BlendingFactor.OneMinusDstColor, BlendingFactor.One, BlendingFactor.One, BlendingFactor.Zero);
-                    break;
-                case 13: // GxBlendAdd
-                    gl.Enable(EnableCap.Blend);
-                    gl.Uniform1(alphaRefLoc, -1.0f);
-                    gl.BlendFuncSeparate(BlendingFactor.One, BlendingFactor.OneMinusSrcAlpha, BlendingFactor.One, BlendingFactor.OneMinusSrcAlpha);
-                    break;
-                default:
-                    throw new Exception("Unsupport blend mode: " + blendType);
-            }
         }
     }
 }

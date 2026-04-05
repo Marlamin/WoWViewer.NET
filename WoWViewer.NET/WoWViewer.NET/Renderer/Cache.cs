@@ -164,7 +164,6 @@ namespace WoWViewer.NET.Renderer
                     BLPUsers.Remove(fileDataId);
                     if (BLPCache.TryGetValue(fileDataId, out var textureId))
                     {
-                        Console.WriteLine("Deleting BLP texture " + textureId);
                         gl.DeleteTexture(textureId);
                         BLPCache.Remove(fileDataId);
                     }

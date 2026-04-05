@@ -1,0 +1,694 @@
+﻿using Silk.NET.OpenGL;
+using System.Diagnostics;
+using System.Numerics;
+using WoWFormatLib.Structs.WDT;
+using WoWViewer.NET.Objects;
+using WoWViewer.NET.Raycasting;
+using WoWViewer.NET.Renderer;
+using static WoWViewer.NET.Structs;
+
+namespace WoWViewer.NET.Managers
+{
+    public class SceneManager(GL gl) : IDisposable
+    {
+        private readonly GL _gl = gl ?? throw new ArgumentNullException(nameof(gl));
+
+        public List<Container3D> SceneObjects { get; } = [];
+        public Lock SceneObjectLock { get; } = new();
+
+        private readonly Queue<MapTile> tilesToLoad = new();
+        private int totalTilesToLoad = 0;
+        private readonly Dictionary<uint, uint> uuidUsers = [];
+        private readonly HashSet<MapTile> loadedTiles = [];
+
+        private WDT? currentWDT;
+        public uint CurrentWDTFileDataID { get; private set; } = 775971;
+
+        public Container3D? SelectedObject { get; set; } = null;
+
+        private DebugRenderer? debugRenderer;
+        public bool ShowBoundingBoxes { get; set; } = false;
+        public bool ShowBoundingSpheres { get; set; } = false;
+
+        public bool RenderADT { get; set; } = true;
+        public bool RenderWMO { get; set; } = true;
+        public bool RenderM2 { get; set; } = false;
+
+        public Vector3 LightDirection { get; set; } = new Vector3(0.5f, 1f, 0.5f);
+
+        private uint defaultTextureID;
+
+        private uint adtShaderProgram;
+        private uint wmoShaderProgram;
+        private uint m2ShaderProgram;
+        private uint debugShaderProgram;
+
+        public bool SceneLoaded => loadedTiles.Count > 0;
+        public string StatusMessage { get; private set; } = "";
+
+        public void Initialize(uint adtShader, uint wmoShader, uint m2Shader, uint debugShader)
+        {
+            adtShaderProgram = adtShader;
+            wmoShaderProgram = wmoShader;
+            m2ShaderProgram = m2Shader;
+            debugShaderProgram = debugShader;
+
+            debugRenderer = new DebugRenderer(_gl, debugShaderProgram);
+            defaultTextureID = MakeDefaultTexture();
+        }
+
+        public void LoadWDT(uint wdtFileDataID)
+        {
+            if (CurrentWDTFileDataID != wdtFileDataID)
+            {
+                loadedTiles.Clear();
+
+                lock (SceneObjectLock)
+                    SceneObjects.Clear();
+
+                CurrentWDTFileDataID = wdtFileDataID;
+                currentWDT = Cache.GetOrLoadWDT(CurrentWDTFileDataID);
+            }
+        }
+
+        public WDT? GetCurrentWDT()
+        {
+            currentWDT ??= Cache.GetOrLoadWDT(CurrentWDTFileDataID);
+            return currentWDT;
+        }
+
+        public void UpdateTilesByCameraPos(Vector3 cameraPosition)
+        {
+            if (currentWDT == null)
+                return;
+
+            var (x, y) = GetTileFromPosition(cameraPosition);
+
+            var usedTiles = new List<MapTile>();
+
+            for (int xOffset = -1; xOffset <= 1; xOffset++)
+            {
+                for (int yOffset = -1; yOffset <= 1; yOffset++)
+                {
+                    byte tileX = (byte)(x + xOffset);
+                    byte tileY = (byte)(y + yOffset);
+
+                    if (tileX < 0 || tileX > 63 || tileY < 0 || tileY > 63)
+                        continue;
+
+                    if (!currentWDT.Value.tiles.Contains((tileX, tileY)))
+                        continue;
+
+                    var mapTile = new MapTile
+                    {
+                        tileX = tileX,
+                        tileY = tileY,
+                        wdtFileDataID = CurrentWDTFileDataID
+                    };
+
+                    usedTiles.Add(mapTile);
+
+                    if (!loadedTiles.Contains(mapTile) && !tilesToLoad.Contains(mapTile))
+                    {
+                        //Console.WriteLine($"Queuing tile {mapTile.tileX},{mapTile.tileY} for load (3x3 around camera, which is in tile {x},{y})");
+                        tilesToLoad.Enqueue(mapTile);
+                        totalTilesToLoad++;
+                    }
+                }
+            }
+
+            foreach (var tile in loadedTiles.ToList())
+            {
+                if (!usedTiles.Contains(tile))
+                {
+                    //Console.WriteLine($"Releasing tile {tile.tileX},{tile.tileY} as it's no longer in the 3x3 around the camera");
+                    loadedTiles.Remove(tile);
+
+                    lock (SceneObjectLock)
+                    {
+                        var adtToRemove = SceneObjects.FirstOrDefault(x => x is ADTContainer adt && adt.mapTile.wdtFileDataID == tile.wdtFileDataID && adt.mapTile.tileX == tile.tileX && adt.mapTile.tileY == tile.tileY) as ADTContainer;
+                        if (adtToRemove != null)
+                        {
+                            SceneObjects.Remove(adtToRemove);
+                            Cache.ReleaseADT(_gl, adtToRemove.mapTile, adtToRemove.mapTile.wdtFileDataID);
+
+                            List<WMOContainer> wmosToRemove = [.. SceneObjects.Where(x => x is WMOContainer wmo && wmo.ParentFileDataId == adtToRemove.Terrain.rootADTFileDataID).Select(x => (WMOContainer)x)];
+                            foreach (var wmo in wmosToRemove)
+                            {
+                                if (uuidUsers.TryGetValue(wmo.UniqueID, out var count))
+                                {
+                                    if (count > 1)
+                                    {
+                                        uuidUsers[wmo.UniqueID] = count - 1;
+                                    }
+                                    else
+                                    {
+                                        SceneObjects.Remove(wmo);
+                                        Cache.ReleaseWMO(_gl, wmo.FileDataId, wmo.ParentFileDataId);
+                                        uuidUsers.Remove(wmo.UniqueID);
+                                    }
+                                }
+                            }
+
+                            List<M2Container> m2sToRemove = [.. SceneObjects.Where(x => x is M2Container m2 && m2.ParentFileDataId == adtToRemove.Terrain.rootADTFileDataID).Select(x => (M2Container)x)];
+                            foreach (var m2 in m2sToRemove)
+                            {
+                                SceneObjects.Remove(m2);
+                                Cache.ReleaseM2(_gl, m2.FileDataId, m2.ParentFileDataId);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        public bool ProcessNextTile()
+        {
+            if (tilesToLoad.Count == 0)
+                return false;
+
+            var mapTile = tilesToLoad.Dequeue();
+            var tilesLoaded = totalTilesToLoad - tilesToLoad.Count;
+            StatusMessage = $"Loading tile {mapTile.tileX},{mapTile.tileY} ({tilesLoaded}/{totalTilesToLoad})...";
+
+            var timer = new Stopwatch();
+            timer.Start();
+
+            Renderer.Structs.Terrain adt;
+
+            try
+            {
+                adt = Cache.GetOrLoadADT(_gl, mapTile, adtShaderProgram, mapTile.wdtFileDataID);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Error loading ADT: " + ex.ToString());
+                return false;
+            }
+
+            timer.Stop();
+
+            //Console.WriteLine($"Loaded ADT {mapTile.tileX},{mapTile.tileY} in {timer.ElapsedMilliseconds} ms");
+
+            var adtContainer = new ADTContainer(_gl, adt, mapTile, adtShaderProgram);
+            SceneObjects.Add(adtContainer);
+
+            foreach (var worldModel in adt.worldModelBatches)
+            {
+                if (uuidUsers.ContainsKey(worldModel.uniqueID))
+                    continue;
+
+                var worldModelContainer = new WMOContainer(_gl, worldModel.fileDataID, wmoShaderProgram, adt.rootADTFileDataID)
+                {
+                    Position = worldModel.position,
+                    Rotation = worldModel.rotation,
+                    Scale = worldModel.scale,
+                    UniqueID = worldModel.uniqueID
+                };
+
+                SceneObjects.Add(worldModelContainer);
+
+                if (uuidUsers.TryGetValue(worldModel.uniqueID, out var count))
+                    uuidUsers[worldModel.uniqueID] = count + 1;
+                else
+                    uuidUsers[worldModel.uniqueID] = 1;
+            }
+
+            foreach (var doodad in adt.doodads)
+            {
+                var doodadContainer = new M2Container(_gl, doodad.fileDataID, m2ShaderProgram, adt.rootADTFileDataID)
+                {
+                    Position = doodad.position,
+                    Rotation = doodad.rotation,
+                    Scale = doodad.scale
+                };
+
+                SceneObjects.Add(doodadContainer);
+            }
+
+            loadedTiles.Add(mapTile);
+
+            if (tilesToLoad.Count == 0)
+            {
+                StatusMessage = "";
+            }
+
+            return true;
+        }
+
+        public void PerformRaycast(float mouseX, float mouseY, Camera camera, int windowWidth, int windowHeight)
+        {
+            var ray = camera.GetRayFromScreen(mouseX, mouseY, windowWidth, windowHeight);
+
+            Container3D? closestObject = null;
+            float closestDistance = float.MaxValue;
+
+            lock (SceneObjectLock)
+            {
+                foreach (var sceneObject in SceneObjects)
+                {
+                    if (sceneObject is ADTContainer)
+                        continue;
+
+                    if (!RenderWMO && sceneObject is WMOContainer)
+                        continue;
+
+                    if (!RenderM2 && sceneObject is M2Container)
+                        continue;
+
+                    var sphere = sceneObject.GetBoundingSphere();
+                    if (sphere.HasValue)
+                    {
+                        if (IntersectionTests.RayIntersectsSphere(ray, sphere.Value, out float sphereDistance))
+                        {
+                            if (sphereDistance < closestDistance)
+                            {
+                                var box = sceneObject.GetBoundingBox();
+                                if (box.HasValue && IntersectionTests.RayIntersectsBox(ray, box.Value, out float boxDistance))
+                                {
+                                    if (boxDistance < closestDistance)
+                                    {
+                                        closestDistance = boxDistance;
+                                        closestObject = sceneObject;
+                                    }
+                                }
+                                else if (!box.HasValue)
+                                {
+                                    closestDistance = sphereDistance;
+                                    closestObject = sceneObject;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            SelectedObject?.IsSelected = false;
+            SelectedObject = closestObject;
+            SelectedObject?.IsSelected = true;
+        }
+
+        public unsafe void RenderScene(Camera camera, out bool gizmoWasUsing, out bool gizmoWasOver)
+        {
+            var m2ProjLocation = _gl.GetUniformLocation(m2ShaderProgram, "projection_matrix");
+            var m2ViewLocation = _gl.GetUniformLocation(m2ShaderProgram, "view_matrix");
+            var m2ModelLocation = _gl.GetUniformLocation(m2ShaderProgram, "model_matrix");
+
+            var wmoProjLocation = _gl.GetUniformLocation(wmoShaderProgram, "projection_matrix");
+            var wmoViewLocation = _gl.GetUniformLocation(wmoShaderProgram, "view_matrix");
+            var wmoModelLocation = _gl.GetUniformLocation(wmoShaderProgram, "model_matrix");
+            var wmoVertexShaderIDLocation = _gl.GetUniformLocation(wmoShaderProgram, "vertexShader");
+            var wmoPixelShaderIDLocation = _gl.GetUniformLocation(wmoShaderProgram, "pixelShader");
+
+            var adtProjLocation = _gl.GetUniformLocation(adtShaderProgram, "projection_matrix");
+            var adtRotLocation = _gl.GetUniformLocation(adtShaderProgram, "rotation_matrix");
+            var adtModelLocation = _gl.GetUniformLocation(adtShaderProgram, "model_matrix");
+
+            var adtLightDirectionLocation = _gl.GetUniformLocation(adtShaderProgram, "lightDirection");
+            var m2LightDirectionLocation = _gl.GetUniformLocation(m2ShaderProgram, "lightDirection");
+            var wmoLightDirectionLocation = _gl.GetUniformLocation(wmoShaderProgram, "lightDirection");
+
+            var heightScaleUniforms = new int[8];
+            for (int i = 0; i < 8; i++)
+                heightScaleUniforms[i] = _gl.GetUniformLocation(adtShaderProgram, $"heightScales[{i}]");
+
+            var heightOffsetUniforms = new int[8];
+            for (int i = 0; i < 8; i++)
+                heightOffsetUniforms[i] = _gl.GetUniformLocation(adtShaderProgram, $"heightOffsets[{i}]");
+
+            var layerScaleUniforms = new int[8];
+            for (int i = 0; i < 8; i++)
+                layerScaleUniforms[i] = _gl.GetUniformLocation(adtShaderProgram, $"layerScales[{i}]");
+
+            var alphaLayerUniforms = new int[2];
+            for (int i = 0; i < 2; i++)
+                alphaLayerUniforms[i] = _gl.GetUniformLocation(adtShaderProgram, $"alphaLayers[{i}]");
+
+            var diffuseLayerUniforms = new int[8];
+            for (int i = 0; i < 8; i++)
+                diffuseLayerUniforms[i] = _gl.GetUniformLocation(adtShaderProgram, $"diffuseLayers[{i}]");
+
+            var heightLayerUniforms = new int[8];
+            for (int i = 0; i < 8; i++)
+                heightLayerUniforms[i] = _gl.GetUniformLocation(adtShaderProgram, $"heightLayers[{i}]");
+
+            var m2AlphaRefLoc = _gl.GetUniformLocation(m2ShaderProgram, "alphaRef");
+            var wmoAlphaRefLoc = _gl.GetUniformLocation(wmoShaderProgram, "alphaRef");
+
+            var projectionMatrix = camera.GetProjectionMatrix();
+
+            foreach (var sceneObject in SceneObjects)
+            {
+                if (sceneObject is M2Container activeM2)
+                {
+                    if (!RenderM2 && !activeM2.forceRender)
+                        continue;
+
+                    if (activeM2.FileDataId == 2061670)
+                    {
+                        activeM2.FileDataId = 2061670;
+                        activeM2.Rotation = new Vector3(activeM2.Rotation.X, activeM2.Rotation.Y * -1, activeM2.Rotation.Z);
+                        activeM2.Scale = 1f;
+                    }
+
+                    var m2 = Cache.GetOrLoadM2(_gl, activeM2.FileDataId, m2ShaderProgram, activeM2.ParentFileDataId);
+
+                    _gl.UseProgram(m2ShaderProgram);
+
+                    _gl.UniformMatrix4(m2ProjLocation, 1, false, (float*)&projectionMatrix);
+
+                    var viewMatrix = camera.GetViewMatrix();
+                    viewMatrix *= Matrix4x4.CreateRotationZ(MathF.PI / 180f * 180f);
+
+                    _gl.UniformMatrix4(m2ViewLocation, 1, false, (float*)&viewMatrix);
+
+                    var modelMatrix = Matrix4x4.CreateScale(sceneObject.Scale);
+                    modelMatrix *= Matrix4x4.CreateRotationZ(MathF.PI / 180f * (sceneObject.Rotation.Y - 270f));
+                    modelMatrix *= Matrix4x4.CreateTranslation(sceneObject.Position.X, sceneObject.Position.Z * -1, sceneObject.Position.Y);
+                    modelMatrix *= Matrix4x4.CreateRotationZ(MathF.PI / 180f * -270f);
+
+                    _gl.UniformMatrix4(m2ModelLocation, 1, false, (float*)&modelMatrix);
+
+                    _gl.Uniform3(m2LightDirectionLocation, LightDirection.X, LightDirection.Y, LightDirection.Z);
+
+                    _gl.ActiveTexture(TextureUnit.Texture0);
+
+                    _gl.BindVertexArray(m2.vao);
+
+                    for (var i = 0; i < m2.submeshes.Length; i++)
+                    {
+                        var submesh = m2.submeshes[i];
+                        if (!activeM2.EnabledGeosets[i])
+                            continue;
+
+                        SwitchBlendMode((int)submesh.blendType, _gl, m2AlphaRefLoc);
+
+                        _gl.BindTexture(TextureTarget.Texture2D, submesh.material);
+                        _gl.DrawElements(PrimitiveType.Triangles, submesh.numFaces, DrawElementsType.UnsignedInt, (void*)(submesh.firstFace * 4));
+                        _gl.BindTexture(TextureTarget.Texture2D, 0);
+                    }
+                }
+                else if (sceneObject is WMOContainer wmoContainer)
+                {
+                    if (!RenderWMO)
+                        continue;
+
+                    var wmo = Cache.GetOrLoadWMO(_gl, sceneObject.FileDataId, wmoShaderProgram, sceneObject.ParentFileDataId);
+
+                    _gl.UseProgram(wmoShaderProgram);
+
+                    _gl.UniformMatrix4(wmoProjLocation, 1, false, (float*)&projectionMatrix);
+
+                    var viewMatrix = camera.GetViewMatrix();
+                    viewMatrix *= Matrix4x4.CreateRotationZ(MathF.PI / 180f * 180f);
+
+                    _gl.UniformMatrix4(wmoViewLocation, 1, false, (float*)&viewMatrix);
+
+                    var modelMatrix = Matrix4x4.CreateScale(sceneObject.Scale);
+                    modelMatrix *= Matrix4x4.CreateRotationX(MathF.PI / 180f * wmoContainer.Rotation.X);
+                    modelMatrix *= Matrix4x4.CreateRotationY(MathF.PI / 180f * -wmoContainer.Rotation.Z);
+                    modelMatrix *= Matrix4x4.CreateRotationZ(MathF.PI / 180f * (wmoContainer.Rotation.Y - 270f));
+                    modelMatrix *= Matrix4x4.CreateTranslation(wmoContainer.Position.X, wmoContainer.Position.Z * -1, wmoContainer.Position.Y);
+                    modelMatrix *= Matrix4x4.CreateRotationZ(MathF.PI / 180f * -270f);
+
+                    _gl.UniformMatrix4(wmoModelLocation, 1, false, (float*)&modelMatrix);
+
+                    _gl.Uniform3(wmoLightDirectionLocation, LightDirection.X, LightDirection.Y, LightDirection.Z);
+
+                    for (var j = 0; j < wmo.wmoRenderBatch.Length; j++)
+                    {
+                        if (wmo.groupBatches[wmo.wmoRenderBatch[j].groupID].vao == 0)
+                            continue;
+
+                        var firstFace = wmo.wmoRenderBatch[j].firstFace;
+                        var numFaces = wmo.wmoRenderBatch[j].numFaces;
+
+                        _gl.BindVertexArray(wmo.groupBatches[wmo.wmoRenderBatch[j].groupID].vao);
+
+                        _gl.Uniform1(wmoVertexShaderIDLocation, (float)ShaderEnums.WMOShaders[(int)wmo.wmoRenderBatch[j].shader].VertexShader);
+                        _gl.Uniform1(wmoPixelShaderIDLocation, (float)ShaderEnums.WMOShaders[(int)wmo.wmoRenderBatch[j].shader].PixelShader);
+
+                        SwitchBlendMode((int)wmo.wmoRenderBatch[j].blendType, _gl, wmoAlphaRefLoc);
+
+                        for (var m = 0; m < wmo.wmoRenderBatch[j].materialID.Length; m++)
+                        {
+                            _gl.ActiveTexture(TextureUnit.Texture0 + m);
+                            if (wmo.wmoRenderBatch[j].materialID[m] == -1)
+                                _gl.BindTexture(TextureTarget.Texture2D, defaultTextureID);
+                            else
+                                _gl.BindTexture(TextureTarget.Texture2D, (uint)wmo.wmoRenderBatch[j].materialID[m]);
+                        }
+
+                        _gl.DrawElements(PrimitiveType.Triangles, numFaces, DrawElementsType.UnsignedShort, (void*)(firstFace * 2));
+
+                        for (var m = 0; m < wmo.wmoRenderBatch[j].materialID.Length; m++)
+                        {
+                            _gl.ActiveTexture(TextureUnit.Texture0 + m);
+                            _gl.BindTexture(TextureTarget.Texture2D, 0);
+                        }
+                    }
+                }
+                else if (sceneObject is ADTContainer adt)
+                {
+                    if (!RenderADT)
+                        continue;
+
+                    _gl.UseProgram(adtShaderProgram);
+
+                    var modelviewMatrix = Matrix4x4.CreateRotationZ(MathF.PI / 180f * 180f);
+                    _gl.UniformMatrix4(adtModelLocation, 1, false, (float*)&modelviewMatrix);
+
+                    var rotationMatrix = camera.GetViewMatrix();
+                    _gl.UniformMatrix4(adtRotLocation, 1, false, (float*)&rotationMatrix);
+                    _gl.UniformMatrix4(adtProjLocation, 1, false, (float*)&projectionMatrix);
+
+                    _gl.Uniform3(adtLightDirectionLocation, LightDirection.X, LightDirection.Y, LightDirection.Z);
+
+                    _gl.BindVertexArray(adt.Terrain.vao);
+                    _gl.Disable(EnableCap.Blend);
+
+                    for (int c = 0; c < 256; c++)
+                    {
+                        var batch = adt.Terrain.renderBatches[c];
+
+                        for (int j = 0; j < 2; j++)
+                        {
+                            _gl.Uniform1(alphaLayerUniforms[j], j);
+                            _gl.ActiveTexture(TextureUnit.Texture0 + j);
+                            _gl.BindTexture(TextureTarget.Texture2D, (batch.alphaMaterialID[j]) == -1 ? defaultTextureID : (uint)batch.alphaMaterialID[j]);
+                        }
+
+                        for (int j = 0; j < 8; j++)
+                        {
+                            _gl.Uniform1(heightScaleUniforms[j], batch.heightScales[j]);
+                            _gl.Uniform1(heightOffsetUniforms[j], batch.heightOffsets[j]);
+                            _gl.Uniform1(layerScaleUniforms[j], batch.scales[j]);
+
+                            _gl.Uniform1(diffuseLayerUniforms[j], j + 7);
+                            _gl.ActiveTexture(TextureUnit.Texture7 + j);
+                            _gl.BindTexture(TextureTarget.Texture2D, (batch.materialID[j]) == -1 ? defaultTextureID : (uint)batch.materialID[j]);
+                            _gl.Uniform1(heightLayerUniforms[j], j + 15);
+                            _gl.ActiveTexture(TextureUnit.Texture15 + j);
+                            _gl.BindTexture(TextureTarget.Texture2D, (batch.heightMaterialIDs[j]) == -1 ? defaultTextureID : (uint)batch.heightMaterialIDs[j]);
+                        }
+
+                        _gl.DrawElements(PrimitiveType.Triangles, (uint)((c + 1) * 768) - (uint)c * 768, DrawElementsType.UnsignedInt, (void*)((c * 768) * 4));
+
+                        for (int j = 0; j < 8; j++)
+                        {
+                            _gl.ActiveTexture(TextureUnit.Texture0 + j);
+                            _gl.BindTexture(TextureTarget.Texture2D, 0);
+                            _gl.ActiveTexture(TextureUnit.Texture7 + j);
+                            _gl.BindTexture(TextureTarget.Texture2D, 0);
+                            _gl.ActiveTexture(TextureUnit.Texture15 + j);
+                            _gl.BindTexture(TextureTarget.Texture2D, 0);
+                        }
+                    }
+                }
+            }
+
+            _gl.BindVertexArray(0);
+
+            gizmoWasUsing = false;
+            gizmoWasOver = false;
+        }
+
+        public void RenderDebug(Camera camera, out bool gizmoWasUsing, out bool gizmoWasOver)
+        {
+            if (debugRenderer == null)
+            {
+                gizmoWasUsing = false;
+                gizmoWasOver = false;
+                return;
+            }
+
+            debugRenderer.Clear();
+
+            gizmoWasUsing = false;
+            gizmoWasOver = false;
+
+            lock (SceneObjectLock)
+            {
+                foreach (var sceneObject in SceneObjects)
+                {
+                    if (sceneObject is ADTContainer)
+                        continue;
+
+                    if (!RenderWMO && sceneObject is WMOContainer && !sceneObject.IsSelected)
+                        continue;
+
+                    if (!RenderM2 && sceneObject is M2Container && !sceneObject.IsSelected)
+                        continue;
+
+                    var color = sceneObject.IsSelected ? new Vector4(0, 1, 0, 1) : new Vector4(1, 1, 0, 1);
+
+                    if (ShowBoundingBoxes || sceneObject.IsSelected)
+                    {
+                        var box = sceneObject.GetBoundingBox();
+                        if (box.HasValue)
+                        {
+                            debugRenderer.DrawBox(box.Value.Min, box.Value.Max, color);
+                        }
+                    }
+
+                    if (ShowBoundingSpheres)
+                    {
+                        var sphere = sceneObject.GetBoundingSphere();
+                        if (sphere.HasValue)
+                        {
+                            debugRenderer.DrawSphere(sphere.Value.Center, sphere.Value.Radius, color);
+                        }
+                    }
+                }
+            }
+
+            var debugViewMatrix = camera.GetViewMatrix();
+            debugViewMatrix *= Matrix4x4.CreateRotationZ(MathF.PI / 180f * 180f);
+            var projectionMatrix = camera.GetProjectionMatrix();
+            debugRenderer.Render(projectionMatrix, debugViewMatrix);
+        }
+
+        private static (byte x, byte y) GetTileFromPosition(Vector3 position)
+        {
+            const float tileSize = 533.33333f;
+            const int mapCenter = 32;
+
+            int tileX = mapCenter - (int)Math.Floor(position.Y / tileSize);
+            int tileY = mapCenter - (int)Math.Floor(position.X / tileSize);
+
+            tileX = Math.Clamp(tileX, 0, 63);
+            tileY = Math.Clamp(tileY, 0, 63);
+
+            return ((byte)tileX, (byte)tileY);
+        }
+
+        private unsafe uint MakeDefaultTexture()
+        {
+            var defaultTexture = _gl.GenTexture();
+            _gl.BindTexture(TextureTarget.Texture2D, defaultTexture);
+            byte[] fill = [0, 0, 0, 0];
+            fixed (byte* fillPtr = fill)
+            {
+                _gl.TexImage2D(TextureTarget.Texture2D, 0, InternalFormat.Rgba8, 1, 1, 0, PixelFormat.Rgba, PixelType.UnsignedByte, fillPtr);
+            }
+
+            _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Linear);
+            _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Linear);
+            _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)TextureWrapMode.Repeat);
+            _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, (int)TextureWrapMode.Repeat);
+
+            return defaultTexture;
+        }
+
+        private static void SwitchBlendMode(int blendType, GL gl, int alphaRefLoc)
+        {
+            switch (blendType)
+            {
+                case 0:
+                    gl.Disable(EnableCap.Blend);
+                    gl.Uniform1(alphaRefLoc, -1.0f);
+                    break;
+                case 1:
+                    gl.Disable(EnableCap.Blend);
+                    gl.Uniform1(alphaRefLoc, 0.90393700787f);
+                    break;
+                case 2:
+                    gl.Enable(EnableCap.Blend);
+                    gl.Uniform1(alphaRefLoc, -1.0f);
+                    gl.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
+                    break;
+                case 3:
+                    gl.Enable(EnableCap.Blend);
+                    gl.Uniform1(alphaRefLoc, -1.0f);
+                    gl.BlendFuncSeparate(BlendingFactor.SrcAlpha, BlendingFactor.One, BlendingFactor.Zero, BlendingFactor.One);
+                    break;
+                case 4:
+                    gl.Enable(EnableCap.Blend);
+                    gl.Uniform1(alphaRefLoc, -1.0f);
+                    gl.BlendFuncSeparate(BlendingFactor.DstColor, BlendingFactor.Zero, BlendingFactor.DstAlpha, BlendingFactor.Zero);
+                    break;
+                case 5:
+                    gl.Enable(EnableCap.Blend);
+                    gl.Uniform1(alphaRefLoc, -1.0f);
+                    gl.BlendFuncSeparate(BlendingFactor.DstColor, BlendingFactor.SrcColor, BlendingFactor.DstAlpha, BlendingFactor.SrcAlpha);
+                    break;
+                case 6:
+                    gl.Enable(EnableCap.Blend);
+                    gl.Uniform1(alphaRefLoc, -1.0f);
+                    gl.BlendFuncSeparate(BlendingFactor.DstColor, BlendingFactor.One, BlendingFactor.DstAlpha, BlendingFactor.One);
+                    break;
+                case 7:
+                    gl.Enable(EnableCap.Blend);
+                    gl.Uniform1(alphaRefLoc, -1.0f);
+                    gl.BlendFuncSeparate(BlendingFactor.OneMinusSrcAlpha, BlendingFactor.One, BlendingFactor.OneMinusSrcAlpha, BlendingFactor.One);
+                    break;
+                case 8:
+                    gl.Enable(EnableCap.Blend);
+                    gl.Uniform1(alphaRefLoc, -1.0f);
+                    gl.BlendFuncSeparate(BlendingFactor.OneMinusSrcAlpha, BlendingFactor.Zero, BlendingFactor.OneMinusSrcAlpha, BlendingFactor.Zero);
+                    break;
+                case 9:
+                    gl.Enable(EnableCap.Blend);
+                    gl.Uniform1(alphaRefLoc, -1.0f);
+                    gl.BlendFuncSeparate(BlendingFactor.SrcAlpha, BlendingFactor.Zero, BlendingFactor.SrcAlpha, BlendingFactor.Zero);
+                    break;
+                case 10:
+                    gl.Enable(EnableCap.Blend);
+                    gl.Uniform1(alphaRefLoc, -1.0f);
+                    gl.BlendFuncSeparate(BlendingFactor.One, BlendingFactor.One, BlendingFactor.Zero, BlendingFactor.One);
+                    break;
+                case 11:
+                    gl.Enable(EnableCap.Blend);
+                    gl.Uniform1(alphaRefLoc, -1.0f);
+                    gl.BlendFuncSeparate(BlendingFactor.ConstantAlpha, BlendingFactor.OneMinusConstantAlpha, BlendingFactor.ConstantAlpha, BlendingFactor.OneMinusConstantAlpha);
+                    break;
+                case 12:
+                    gl.Enable(EnableCap.Blend);
+                    gl.Uniform1(alphaRefLoc, -1.0f);
+                    gl.BlendFuncSeparate(BlendingFactor.OneMinusDstColor, BlendingFactor.One, BlendingFactor.One, BlendingFactor.Zero);
+                    break;
+                case 13:
+                    gl.Enable(EnableCap.Blend);
+                    gl.Uniform1(alphaRefLoc, -1.0f);
+                    gl.BlendFuncSeparate(BlendingFactor.One, BlendingFactor.OneMinusSrcAlpha, BlendingFactor.One, BlendingFactor.OneMinusSrcAlpha);
+                    break;
+                default:
+                    throw new Exception("Unsupport blend mode: " + blendType);
+            }
+        }
+
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                debugRenderer?.Dispose();
+            }
+        }
+    }
+}

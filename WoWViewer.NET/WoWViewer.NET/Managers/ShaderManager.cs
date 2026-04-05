@@ -9,7 +9,7 @@ namespace WoWViewer.NET.Managers
         private readonly Lock shaderLock = new();
         private static readonly Dictionary<string, DateTime> shaderMTimes = [];
         public bool shadersReady = false;
-        private string shaderFolder;
+        private readonly string shaderFolder;
 
         public ShaderManager(GL gl, string shaderFolder)
         {

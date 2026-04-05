@@ -1,21 +1,20 @@
 ﻿using CASCLib;
-using System.Net;
 
 namespace WoWViewer.NET
 {
     public static class Listfile
     {
-        public static Dictionary<uint, string> FDIDToFilename = new Dictionary<uint, string>();
-        public static Dictionary<string, uint> FilenameToFDID = new Dictionary<string, uint>();
+        private static Dictionary<uint, string> FDIDToFilename = [];
+        private static Dictionary<string, uint> FilenameToFDID = [];
 
         public static void Update()
         {
             try
             {
-                using (var client = new WebClient())
+                using (var client = new HttpClient())
                 using (var stream = new MemoryStream())
                 {
-                    var responseStream = client.OpenRead("https://github.com/wowdev/wow-listfile/releases/latest/download/community-listfile.csv");
+                    var responseStream = client.GetStreamAsync("https://github.com/wowdev/wow-listfile/releases/latest/download/community-listfile.csv").Result;
                     responseStream.CopyTo(stream);
                     File.WriteAllBytes("listfile.csv", stream.ToArray());
                     responseStream.Close();
