@@ -31,7 +31,15 @@ namespace WoWViewer.NET.Renderer
             if (M2Cache.TryGetValue(fileDataId, out DoodadBatch value))
                 return value;
 
-            M2Cache.Add(fileDataId, M2Loader.LoadM2(gl, fileDataId, shaderProgram));
+            try
+            {
+                M2Cache.Add(fileDataId, M2Loader.LoadM2(gl, fileDataId, shaderProgram));
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine("Error loading M2 " + fileDataId + ": " + e.Message);
+                M2Cache.Add(fileDataId, M2Loader.LoadM2(gl, 166046, shaderProgram));
+            }
 
             return M2Cache[fileDataId];
         }
@@ -69,7 +77,16 @@ namespace WoWViewer.NET.Renderer
             if (WMOCache.TryGetValue(fileDataId, out WorldModel value))
                 return value;
 
-            WMOCache.Add(fileDataId, WMOLoader.LoadWMO(gl, fileDataId, shaderProgram));
+            try
+            {
+                WMOCache.Add(fileDataId, WMOLoader.LoadWMO(gl, fileDataId, shaderProgram));
+
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine("!!! Error loading WMO " + fileDataId + ": " + e.Message);
+                WMOCache.Add(fileDataId, WMOLoader.LoadWMO(gl, 112521, shaderProgram)); // missingwmo.wmo
+            }
 
             return WMOCache[fileDataId];
         }
@@ -109,7 +126,7 @@ namespace WoWViewer.NET.Renderer
             if (ADTCache.TryGetValue(key, out Terrain value))
                 return value;
 
-            ADTCache.Add(key, ADTLoader.LoadADT(gl, mapTile, shaderProgram));
+            ADTCache.TryAdd(key, ADTLoader.LoadADT(gl, mapTile, shaderProgram));
 
             return ADTCache[key];
         }
@@ -148,7 +165,16 @@ namespace WoWViewer.NET.Renderer
             if (BLPCache.TryGetValue(fileDataId, out uint value))
                 return value;
 
-            BLPCache.Add(fileDataId, BLPLoader.LoadTexture(gl, fileDataId));
+            try
+            {
+                BLPCache.Add(fileDataId, BLPLoader.LoadTexture(gl, fileDataId));
+
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine("Failed to load BLP " + fileDataId + ": " + e.Message);
+                BLPCache.Add(fileDataId, BLPLoader.LoadTexture(gl, 186184));
+            }
 
             return BLPCache[fileDataId];
         }
