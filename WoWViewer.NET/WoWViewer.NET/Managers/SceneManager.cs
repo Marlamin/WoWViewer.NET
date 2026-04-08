@@ -334,6 +334,9 @@ namespace WoWViewer.NET.Managers
                     if (!RenderM2 && sceneObject is M2Container)
                         continue;
 
+                    if(sceneObject.IsSelected)
+                        continue;
+
                     var sphere = sceneObject.GetBoundingSphere();
                     if (sphere.HasValue)
                     {
