@@ -237,14 +237,39 @@ namespace WoWViewer.NET.Managers
             }
         }
 
-        public bool ProcessNextTile()
+        public bool ProcessQueue()
         {
+            // If no ADTs are queued, but other files still are, we return true (and not dequeue tiles) to keep calling this function over and over to handle the various uploads, because these need to be called from this thread, but this does block new ADTs from loading until these are done which isn't ideal.
+
+            // BLP
+            Cache.UploadDecodedBLPs();
+
             if (tilesToLoad.Count == 0)
-                return false;
+            {
+                var blpRemaining = Cache.GetBLPLoadQueueCount();
+                if (blpRemaining > 0)
+                {
+                    StatusMessage = $"Loading textures ({blpRemaining} queued)...";
+                    return true;
+                }
+                else
+                {
+                    // Nothing to do, clear status and return
+                    StatusMessage = "";
+                    return false;
+                }
+            }
+
+            // TODO: WMO
+            // TODO: M2
 
             var mapTile = tilesToLoad.Dequeue();
             var tilesLoaded = totalTilesToLoad - tilesToLoad.Count;
-            StatusMessage = $"Loading tile {mapTile.tileX},{mapTile.tileY} ({tilesLoaded}/{totalTilesToLoad})...";
+            var blpQueueCount = Cache.GetBLPLoadQueueCount();
+            StatusMessage = $"Loading tile {mapTile.tileX},{mapTile.tileY} ({tilesLoaded}/{totalTilesToLoad})";
+
+            if (blpQueueCount > 0)
+                StatusMessage += $" | (busy loading textures ({blpQueueCount} queued)";
 
             var timer = new Stopwatch();
             timer.Start();
@@ -305,11 +330,6 @@ namespace WoWViewer.NET.Managers
             }
 
             loadedTiles.Add(mapTile);
-
-            if (tilesToLoad.Count == 0)
-            {
-                StatusMessage = "";
-            }
 
             return true;
         }
@@ -818,6 +838,8 @@ namespace WoWViewer.NET.Managers
         {
             if (disposing)
             {
+                Cache.StopBLPLoader();
+
                 debugRenderer?.Dispose();
 
                 if (instanceMatrixVBO != 0)

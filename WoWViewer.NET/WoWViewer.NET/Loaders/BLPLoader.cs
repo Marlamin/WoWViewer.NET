@@ -6,19 +6,28 @@ namespace WoWViewer.NET.Loaders
 {
     public static class BLPLoader
     {
-        //public static uint LoadTexture(GL gl, string fileName)
-        //{
-        //    if (Listfile.TryGetFileDataID(fileName, out var fileDataID))
-        //        return LoadTexture(gl, fileDataID);
-        //    else
-        //        throw new Exception("Couldn't find filedataid for file " + fileName + " in listfile!");
-        //}
+        private static readonly byte[] PlaceholderPixels = [255, 0, 255, 255];
 
-        public static unsafe uint LoadTexture(GL gl, uint fileDataID)
+        public static unsafe uint CreatePlaceholderTexture(GL gl)
+        {
+            var textureID = gl.GenTexture();
+            gl.BindTexture(TextureTarget.Texture2D, textureID);
+
+            fixed (byte* buf = PlaceholderPixels)
+                gl.TexImage2D(TextureTarget.Texture2D, 0, InternalFormat.Rgba, 1, 1, 0, PixelFormat.Rgba, PixelType.UnsignedByte, buf);
+
+            gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Linear);
+            gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Linear);
+            gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)TextureWrapMode.Repeat);
+            gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, (int)TextureWrapMode.Repeat);
+
+            return textureID;
+        }
+
+        public static unsafe void LoadTextureIntoID(GL gl, uint fileDataID, uint textureID)
         {
             gl.ActiveTexture(TextureUnit.Texture0);
 
-            var textureID = gl.GenTexture();
             using (var blp = new BLPFile(FileProvider.OpenFile(fileDataID)))
             {
                 gl.BindTexture(TextureTarget.Texture2D, textureID);
@@ -74,8 +83,6 @@ namespace WoWViewer.NET.Loaders
                 gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)TextureWrapMode.Repeat);
                 gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, (int)TextureWrapMode.Repeat);
             }
-
-            return textureID;
         }
 
         public unsafe static uint GenerateAlphaTexture(GL gl, byte[] values, bool saveToFile = false)

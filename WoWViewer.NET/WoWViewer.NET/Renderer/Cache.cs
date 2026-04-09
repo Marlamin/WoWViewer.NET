@@ -20,6 +20,36 @@ namespace WoWViewer.NET.Renderer
         private static readonly Dictionary<uint, List<uint>> M2Users = [];
         private static readonly Dictionary<uint, List<uint>> BLPUsers = [];
 
+        private static GL? cachedGL = null;
+
+        private static readonly HashSet<uint> blpsInFlight = [];
+
+        private static readonly Lock blpQueueLock = new();
+        private static readonly Queue<uint> blpDecodeQueue = [];
+        private static readonly Queue<DecodedBLP> blpUploadQueue = [];
+
+        private static CancellationTokenSource? blpLoaderCancellation;
+        private static Task? blpLoaderTask;
+
+        private struct DecodedBLP
+        {
+            public uint FileDataId;
+            public byte[] PixelData;
+            public int Width;
+            public int Height;
+            public bool IsCompressed;
+            public InternalFormat CompressedFormat;
+            public List<MipLevel>? MipLevels;
+        }
+
+        private struct MipLevel
+        {
+            public byte[] Data;
+            public int Width;
+            public int Height;
+            public int Level;
+        }
+
         #region M2
         public static DoodadBatch GetOrLoadM2(GL gl, uint fileDataId, uint shaderProgram, uint parent)
         {
@@ -157,26 +187,201 @@ namespace WoWViewer.NET.Renderer
         #region BLP
         public static uint GetOrLoadBLP(GL gl, uint fileDataId, uint parent)
         {
+            if (cachedGL == null)
+            {
+                cachedGL = gl;
+                StartBLPLoader();
+            }
+
             if (BLPUsers.TryGetValue(fileDataId, out var users))
                 users.Add(parent);
             else
                 BLPUsers.Add(fileDataId, [parent]);
 
-            if (BLPCache.TryGetValue(fileDataId, out uint value))
+            if (BLPCache.TryGetValue(fileDataId, out var value))
                 return value;
 
-            try
-            {
-                BLPCache.Add(fileDataId, BLPLoader.LoadTexture(gl, fileDataId));
+            var placeholderTextureID = BLPLoader.CreatePlaceholderTexture(gl);
+            BLPCache.Add(fileDataId, placeholderTextureID);
 
-            }
-            catch (Exception e)
+            lock (blpQueueLock)
             {
-                Console.WriteLine("Failed to load BLP " + fileDataId + ": " + e.Message);
-                BLPCache.Add(fileDataId, BLPLoader.LoadTexture(gl, 186184));
-            }
+                if (blpsInFlight.Contains(fileDataId))
+                    return placeholderTextureID;
 
-            return BLPCache[fileDataId];
+                blpsInFlight.Add(fileDataId);
+                blpDecodeQueue.Enqueue(fileDataId);
+
+                return placeholderTextureID;
+            }
+        }
+
+        private static void StartBLPLoader()
+        {
+            if (blpLoaderTask != null)
+                return;
+
+            blpLoaderCancellation = new CancellationTokenSource();
+            blpLoaderTask = Task.Run(() => BLPDecoderWorker(blpLoaderCancellation.Token), blpLoaderCancellation.Token);
+        }
+
+        private static async Task BLPDecoderWorker(CancellationToken cancellationToken)
+        {
+            while (!cancellationToken.IsCancellationRequested)
+            {
+                uint fileDataId = 0;
+                bool hasWork = false;
+
+                lock (blpQueueLock)
+                {
+                    if (blpDecodeQueue.Count > 0)
+                    {
+                        fileDataId = blpDecodeQueue.Dequeue();
+                        hasWork = true;
+                    }
+                }
+
+                if (!hasWork)
+                    continue;
+
+                try
+                {
+                    using var blp = new BLPSharp.BLPFile(WoWFormatLib.FileProviders.FileProvider.OpenFile(fileDataId));
+
+                    var decoded = new DecodedBLP { FileDataId = fileDataId };
+
+                    if (blp.preferredFormat == BLPSharp.BlpPixelFormat.Dxt1 ||
+                        blp.preferredFormat == BLPSharp.BlpPixelFormat.Dxt3 ||
+                        blp.preferredFormat == BLPSharp.BlpPixelFormat.Dxt5)
+                    {
+                        decoded.IsCompressed = true;
+                        decoded.MipLevels = [];
+
+                        if (blp.preferredFormat == BLPSharp.BlpPixelFormat.Dxt1 && blp.alphaSize > 0)
+                            decoded.CompressedFormat = InternalFormat.CompressedRgbaS3TCDxt1Ext;
+                        else if (blp.preferredFormat == BLPSharp.BlpPixelFormat.Dxt1 && blp.alphaSize == 0)
+                            decoded.CompressedFormat = InternalFormat.CompressedRgbS3TCDxt1Ext;
+                        else if (blp.preferredFormat == BLPSharp.BlpPixelFormat.Dxt3)
+                            decoded.CompressedFormat = InternalFormat.CompressedRgbaS3TCDxt3Ext;
+                        else
+                            decoded.CompressedFormat = InternalFormat.CompressedRgbaS3TCDxt5Ext;
+
+                        for (int i = 0; i < blp.MipMapCount; i++)
+                        {
+                            int scale = (int)Math.Pow(2, i);
+                            var width = blp.width / scale;
+                            var height = blp.height / scale;
+
+                            if (width == 0 || height == 0)
+                                break;
+
+                            var bytes = blp.GetPictureData(i, width, height);
+                            decoded.MipLevels.Add(new MipLevel
+                            {
+                                Data = bytes,
+                                Width = width,
+                                Height = height,
+                                Level = i
+                            });
+                        }
+                    }
+                    else
+                    {
+                        decoded.IsCompressed = false;
+                        decoded.PixelData = blp.GetPixels(0, out int width, out int height) ?? throw new Exception("BLP pixel data is null!");
+                        decoded.Width = width;
+                        decoded.Height = height;
+                    }
+
+                    lock (blpQueueLock)
+                        blpUploadQueue.Enqueue(decoded);
+                }
+                catch (Exception e)
+                {
+                    Console.WriteLine($"Failed to decode BLP {fileDataId}: {e.Message}");
+                }
+            }
+        }
+
+        public static void UploadDecodedBLPs()
+        {
+            if (cachedGL == null)
+                return;
+
+            // This may need some tweaking....
+            const int maxUploadsPerFrame = 10;
+            int uploaded = 0;
+
+            while (uploaded < maxUploadsPerFrame)
+            {
+                DecodedBLP decoded;
+                lock (blpQueueLock)
+                {
+                    if (blpUploadQueue.Count == 0)
+                        break;
+
+                    decoded = blpUploadQueue.Dequeue();
+                }
+
+                if (!BLPCache.TryGetValue(decoded.FileDataId, out var textureId))
+                    continue;
+
+                unsafe
+                {
+                    try
+                    {
+                        cachedGL.BindTexture(TextureTarget.Texture2D, textureId);
+
+                        if (decoded.IsCompressed && decoded.MipLevels != null)
+                        {
+                            foreach (var mip in decoded.MipLevels)
+                            {
+                                fixed (byte* ptr = mip.Data)
+                                    cachedGL.CompressedTexImage2D(TextureTarget.Texture2D, mip.Level, decoded.CompressedFormat,
+                                        (uint)mip.Width, (uint)mip.Height, 0, (uint)mip.Data.Length, ptr);
+                            }
+
+                            cachedGL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMaxLevel, decoded.MipLevels.Count - 1);
+                            cachedGL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.LinearMipmapLinear);
+                        }
+                        else
+                        {
+                            fixed (byte* ptr = decoded.PixelData)
+                                cachedGL.TexImage2D(TextureTarget.Texture2D, 0, InternalFormat.Rgba,
+                                    (uint)decoded.Width, (uint)decoded.Height, 0, PixelFormat.Rgba, PixelType.UnsignedByte, ptr);
+
+                            cachedGL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Linear);
+                        }
+
+                        cachedGL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Linear);
+                        cachedGL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)TextureWrapMode.Repeat);
+                        cachedGL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, (int)TextureWrapMode.Repeat);
+                    }
+                    catch (Exception e)
+                    {
+                        Console.WriteLine($"Failed to upload BLP {decoded.FileDataId}: {e.Message}");
+                    }
+                }
+
+                lock (blpQueueLock)
+                    blpsInFlight.Remove(decoded.FileDataId);
+
+                uploaded++;
+            }
+        }
+
+        public static void StopBLPLoader()
+        {
+            blpLoaderCancellation?.Cancel();
+            blpLoaderCancellation?.Dispose();
+            blpLoaderCancellation = null;
+            blpLoaderTask = null;
+        }
+
+        public static int GetBLPLoadQueueCount()
+        {
+            lock (blpQueueLock)
+                return blpDecodeQueue.Count + blpUploadQueue.Count;
         }
 
         public static void ReleaseBLP(GL gl, uint fileDataId, uint parent)

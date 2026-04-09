@@ -285,7 +285,7 @@ namespace WoWViewer.NET
 
                 sceneManager.UpdateTilesByCameraPos(activeCamera.Position);
 
-                sceneManager.ProcessNextTile();
+                sceneManager.ProcessQueue();
 
                 if (!string.IsNullOrEmpty(sceneManager.StatusMessage))
                 {
