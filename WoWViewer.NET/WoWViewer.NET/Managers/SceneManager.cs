@@ -476,9 +476,6 @@ namespace WoWViewer.NET.Managers
 
                 var matrices = new Matrix4x4[Math.Min(instances.Count, MaxInstancesPerBatch)];
 
-                var identityMatrix = Matrix4x4.Identity;
-                _gl.UniformMatrix4(2, 1, false, (float*)&identityMatrix);
-
                 for (var j = 0; j < wmo.wmoRenderBatch.Length; j++)
                 {
                     var batch = wmo.wmoRenderBatch[j];

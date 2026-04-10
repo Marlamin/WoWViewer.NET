@@ -72,8 +72,6 @@ namespace WoWViewer.NET.Renderer
             var oldDepthTest = gl.IsEnabled(EnableCap.DepthTest);
             gl.Disable(EnableCap.DepthTest);
 
-            gl.LineWidth(3.0f);
-
             gl.DrawArrays(PrimitiveType.Lines, 0, (uint)vertices.Count);
 
             if (oldDepthTest)
