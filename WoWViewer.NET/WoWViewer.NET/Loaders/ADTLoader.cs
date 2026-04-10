@@ -4,7 +4,7 @@ using WoWFormatLib.FileProviders;
 using WoWFormatLib.FileReaders;
 using WoWFormatLib.Structs.ADT;
 using WoWViewer.NET.Renderer;
-using static WoWViewer.NET.Renderer.Structs;
+using static WoWViewer.NET.Structs;
 
 namespace WoWViewer.NET.Loaders
 {
@@ -98,7 +98,7 @@ namespace WoWViewer.NET.Loaders
             var texCoordAttrib = gl.GetAttribLocation(shaderProgram, "texCoord");
             var posAttrib = gl.GetAttribLocation(shaderProgram, "position");
 
-            var vertices = new Vertex[256 * 145];
+            var vertices = new ADTVertex[256 * 145];
             var indices = new int[256 * 768];
             var verticesOffset = 0;
             var indicesOffset = 0;
@@ -123,7 +123,7 @@ namespace WoWViewer.NET.Loaders
                     var halfHeight = i * 0.5f;
                     for (var j = 0; j < (isInnerVertice ? 8 : 9); j++)
                     {
-                        var v = new Vertex
+                        var v = new ADTVertex
                         {
                             Normal = new Vector3(chunk.normals.normal_0[idx], chunk.normals.normal_1[idx], chunk.normals.normal_2[idx]),
                             Color = chunk.header.flags.HasFlag(MCNKFlags.mcnk_has_mccv) ? new Vector4(chunk.vertexShading.blue[idx] / 255.0f, chunk.vertexShading.green[idx] / 255.0f, chunk.vertexShading.red[idx] / 255.0f, chunk.vertexShading.alpha[idx] / 255.0f) : new Vector4(0.5f, 0.5f, 0.5f, 1.0f),
@@ -141,7 +141,7 @@ namespace WoWViewer.NET.Loaders
                     }
                 }
 
-                result.startPos = vertices[0];
+                result.startPos = vertices[0].Position;
 
                 int off = c * 145;
                 for (var j = 9; j < 145; j++)
@@ -262,7 +262,7 @@ namespace WoWViewer.NET.Loaders
             }
 
             gl.BindBuffer(BufferTargetARB.ArrayBuffer, result.vertexBuffer);
-            fixed (Vertex* buf = vertices)
+            fixed (ADTVertex* buf = vertices)
                 gl.BufferData(BufferTargetARB.ArrayBuffer, (nuint)vertices.Length * 12 * sizeof(float), buf, GLEnum.StaticDraw);
 
             gl.EnableVertexAttribArray((uint)normalAttrib);

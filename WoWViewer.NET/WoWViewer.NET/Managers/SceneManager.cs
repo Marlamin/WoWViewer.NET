@@ -274,7 +274,7 @@ namespace WoWViewer.NET.Managers
             var timer = new Stopwatch();
             timer.Start();
 
-            Renderer.Structs.Terrain adt;
+            Terrain adt;
 
             try
             {

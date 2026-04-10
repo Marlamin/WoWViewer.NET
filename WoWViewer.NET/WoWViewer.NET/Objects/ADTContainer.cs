@@ -5,10 +5,10 @@ namespace WoWViewer.NET.Objects
 {
     public class ADTContainer : Container3D
     {
-        public Renderer.Structs.Terrain Terrain { get; }
+        public Terrain Terrain { get; }
         public MapTile mapTile;
 
-        public ADTContainer(GL gl, Renderer.Structs.Terrain terrain, MapTile mapTile, uint shaderProgram) : base(gl, mapTile.wdtFileDataID, shaderProgram, mapTile.wdtFileDataID)
+        public ADTContainer(GL gl, Terrain terrain, MapTile mapTile, uint shaderProgram) : base(gl, mapTile.wdtFileDataID, shaderProgram, mapTile.wdtFileDataID)
         {
             Terrain = terrain;
             this.mapTile = mapTile;

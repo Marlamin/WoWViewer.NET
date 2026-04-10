@@ -4,7 +4,7 @@ using WoWFormatLib.FileProviders;
 using WoWFormatLib.FileReaders;
 using WoWFormatLib.Structs.WMO;
 using WoWViewer.NET.Renderer;
-using static WoWViewer.NET.Renderer.Structs;
+using static WoWViewer.NET.Structs;
 
 namespace WoWViewer.NET.Loaders
 {

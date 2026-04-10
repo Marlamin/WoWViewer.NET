@@ -11,7 +11,7 @@ namespace WoWViewer.NET.Objects
 
         public bool forceRender { get; set; } = false;
 
-        private Renderer.Structs.DoodadBatch m2;
+        private Structs.DoodadBatch m2;
 
         public M2Container(GL gl, uint fileDataID, uint shaderProgram, uint parentFileDataId) : base(gl, fileDataID, shaderProgram, parentFileDataId)
         {
