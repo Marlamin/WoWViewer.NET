@@ -10,3 +10,6 @@
 [submodule "WoWViewer.NET/TACTSharp"]
 	path = WoWViewer.NET/TACTSharp
 	url = https://github.com/wowdev/TACTSharp
+[submodule "WoWViewer.NET/DBCD"]
+	path = WoWViewer.NET/DBCD
+	url = https://github.com/wowdev/DBCD
