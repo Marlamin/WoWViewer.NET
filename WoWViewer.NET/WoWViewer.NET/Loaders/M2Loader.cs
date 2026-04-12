@@ -25,7 +25,7 @@ namespace WoWViewer.NET.Loaders
             }
             else
             {
-                throw new Exception("Model " + fileDataID + " does not exist!");
+                throw new FileNotFoundException("Model " + fileDataID + " does not exist!");
             }
 
             Vector3 bbMin, bbMax;
