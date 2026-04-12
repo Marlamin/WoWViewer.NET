@@ -6,6 +6,7 @@ namespace WoWViewer.NET.Services
     {
         public static BuildInstance buildInstance;
         public static bool IsInitialized { get; private set; } = false;
+        public static string BuildName { get; private set; } = "";
 
         public static async Task Initialize(string basedir)
         {
@@ -38,6 +39,9 @@ namespace WoWViewer.NET.Services
             if (buildInstance.Encoding == null || buildInstance.Root == null || buildInstance.Install == null || buildInstance.GroupIndex == null)
                 throw new Exception("Failed to load build components");
 
+            var fullBuildName = buildInstance.BuildConfig.Values["build-name"][0];
+            var splitName = fullBuildName.Replace("WOW-", "").Split("patch");
+            BuildName = splitName[1].Split("_")[0] + "." + splitName[0];
             IsInitialized = true;
         }
 

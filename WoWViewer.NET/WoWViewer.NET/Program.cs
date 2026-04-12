@@ -11,6 +11,8 @@ using System.Runtime.InteropServices;
 using WoWFormatLib.FileProviders;
 using WoWViewer.NET.Managers;
 using WoWViewer.NET.Objects;
+using WoWViewer.NET.Providers;
+using WoWViewer.NET.Services;
 
 namespace WoWViewer.NET
 {
@@ -44,9 +46,11 @@ namespace WoWViewer.NET
         private static bool gizmoWasOver = false;
         private static ImGuizmoOperation currentGizmoOperation = ImGuizmoOperation.Translate;
         private static bool wasSpacePressed = false;
+        private static bool showMapSelection = false;
 
         private static ShaderManager shaderManager;
         private static SceneManager sceneManager;
+        private static DBCManager dbcManager;
 
         static void Main(string[] args)
         {
@@ -125,6 +129,11 @@ namespace WoWViewer.NET
 
                     sceneManager.GetCurrentWDT();
                     sceneManager.PreloadTEX();
+
+                    var dbcProvider = new DBCProvider();
+                    var dbdProvider = new DBDProvider();
+
+                    dbcManager = new DBCManager(dbdProvider, dbcProvider);
                 });
 
                 var startPos = new Vector3(5305f, -4122f, 92f);
@@ -294,19 +303,53 @@ namespace WoWViewer.NET
                     ImGui.End();
                 }
 
-                ImGui.Begin("Map selection");
-
-                ImGui.InputText("WDT", ref WDTFDIDInput, 100);
-
-                if (ImGui.Button("Load WDT"))
-                {
-                    if (uint.TryParse(WDTFDIDInput, out var newWDTI) && sceneManager.CurrentWDTFileDataID != newWDTI && Services.CASC.FileExists(newWDTI))
-                    {
-                        sceneManager.LoadWDT(newWDTI);
-                        sceneManager.PreloadTEX();
-                    }
-                }
+                ImGui.Begin("Menu");
+                if(ImGui.Button("Toggle map selection"))
+                    showMapSelection = !showMapSelection;
                 ImGui.End();
+
+                if (showMapSelection)
+                {
+                    ImGui.Begin("Map selection");
+
+                    var mapDB = dbcManager.GetOrLoad("Map", CASC.BuildName).Result;
+
+                    if(ImGui.BeginTable("MapTable",3 , ImGuiTableFlags.RowBg | ImGuiTableFlags.Borders))
+                    {
+                        ImGui.TableSetupColumn("ID");
+                        ImGui.TableSetupColumn("Name");
+                        foreach (var mapRow in mapDB.Values)
+                        {
+                            var mapID = (int)mapRow["ID"];
+                            var mapDir = (string)mapRow["Directory"];
+                            var mapName = (string)mapRow["MapName_lang"];
+                            var wdtFileDataID = (int)mapRow["WdtFileDataID"];
+
+                            if(wdtFileDataID == 0 || !CASC.FileExists((uint)wdtFileDataID))
+                                continue;
+
+                            ImGui.TableNextRow();
+                            ImGui.TableNextColumn();
+                            ImGui.Text(mapDir);
+                            ImGui.TableNextColumn();
+                            ImGui.Text(mapName);
+                            ImGui.TableNextColumn();
+                            if (ImGui.Selectable("Load " + wdtFileDataID.ToString()))
+                            {
+                                if (sceneManager.CurrentWDTFileDataID != wdtFileDataID && Services.CASC.FileExists((uint)wdtFileDataID))
+                                {
+                                    sceneManager.LoadWDT((uint)wdtFileDataID);
+                                    sceneManager.PreloadTEX();
+                                    var firstTile = sceneManager.GetFirstMapTile();
+                                    var newPos = SceneManager.GetTileCenterPosition(firstTile.x, firstTile.y);
+                                    activeCamera.Position = newPos + new Vector3(0, 0, 100);
+                                }
+                            }
+                        }
+                        ImGui.EndTable();
+                    }
+                    ImGui.End();
+                }
 
                 if (sceneManager.SceneLoaded)
                 {

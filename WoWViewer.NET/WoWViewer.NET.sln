@@ -17,6 +17,10 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CascLib", "CascLib\CascLib\
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TACTSharp", "TACTSharp\TACTSharp\TACTSharp.csproj", "{884A4B58-7B4E-73BF-73CC-48C2E526EC3D}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DBCD", "DBCD\DBCD\DBCD.csproj", "{D13146D5-436B-E8B2-2020-D286F7936937}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DBCD.IO", "DBCD\DBCD.IO\DBCD.IO.csproj", "{C932AC3C-FC1C-6E93-533B-13653D9D1285}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -51,6 +55,14 @@ Global
 		{884A4B58-7B4E-73BF-73CC-48C2E526EC3D}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{884A4B58-7B4E-73BF-73CC-48C2E526EC3D}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{884A4B58-7B4E-73BF-73CC-48C2E526EC3D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D13146D5-436B-E8B2-2020-D286F7936937}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D13146D5-436B-E8B2-2020-D286F7936937}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D13146D5-436B-E8B2-2020-D286F7936937}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D13146D5-436B-E8B2-2020-D286F7936937}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C932AC3C-FC1C-6E93-533B-13653D9D1285}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C932AC3C-FC1C-6E93-533B-13653D9D1285}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C932AC3C-FC1C-6E93-533B-13653D9D1285}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C932AC3C-FC1C-6E93-533B-13653D9D1285}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

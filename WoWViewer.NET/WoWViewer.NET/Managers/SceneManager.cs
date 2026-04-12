@@ -135,6 +135,14 @@ namespace WoWViewer.NET.Managers
             return currentWDT;
         }
 
+        public (byte x, byte y) GetFirstMapTile()
+        {
+            if (currentWDT == null || currentWDT.Value.tiles.Count == 0)
+                return (0, 0);
+
+            return currentWDT.Value.tiles[0];
+        }
+
         public void UpdateTilesByCameraPos(Vector3 cameraPosition)
         {
             if (currentWDT == null)
@@ -702,6 +710,16 @@ namespace WoWViewer.NET.Managers
             tileY = Math.Clamp(tileY, 0, 63);
 
             return ((byte)tileX, (byte)tileY);
+        }
+
+        public static Vector3 GetTileCenterPosition(byte tileX, byte tileY)
+        {
+            const float tileSize = 533.33333f;
+            const int mapCenter = 32;
+            var posX = (mapCenter - tileX) * tileSize - (tileSize / 2);
+            var posY = (mapCenter - tileY) * tileSize - (tileSize / 2);
+            Console.WriteLine("Calculated position for tile {0},{1} is {2},{3}", tileX, tileY, posX, posY);
+            return new Vector3(posY, posX, 0);
         }
 
         private unsafe void SetupInstanceBuffer()

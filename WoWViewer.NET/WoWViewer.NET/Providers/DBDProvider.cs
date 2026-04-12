@@ -1,0 +1,210 @@
+﻿using DBCD.Providers;
+using DBDefsLib;
+using DBDefsLib.Structs;
+using WoWViewer.NET.Managers;
+
+namespace WoWViewer.NET.Providers
+{
+    public class DBDProvider : IDBDProvider
+    {
+        private readonly DBDReader dbdReader;
+        private Dictionary<string, (string FilePath, DBDefinition Definition)> definitionLookup = new(StringComparer.OrdinalIgnoreCase);
+        private Dictionary<string, List<string>> relationshipMap = [];
+        public bool isUsingBDBD = false;
+        public static Lock bdbdLock = new Lock();
+
+        public DBDProvider()
+        {
+            dbdReader = new DBDReader();
+            LoadDefinitions();
+        }
+
+        public static Stream GetBDBDStream(bool forceNew = false)
+        {
+            lock (bdbdLock)
+            {
+                var downloadBDBD = false;
+                var cacheLocation = Path.Combine("cache", "all.bdbd");
+                var fileInfo = new FileInfo(cacheLocation);
+
+                if (fileInfo.Exists)
+                {
+                    if (DateTime.Now > fileInfo.LastWriteTime.AddDays(1))
+                        downloadBDBD = true;
+                }
+                else
+                {
+                    downloadBDBD = true;
+                }
+
+                if (forceNew)
+                    downloadBDBD = true;
+
+                if (downloadBDBD)
+                {
+                    if (!Directory.Exists("cache"))
+                        Directory.CreateDirectory("cache");
+
+                    using (var client = new HttpClient())
+                    {
+                        client.DefaultRequestHeaders.Add("User-Agent", "wow.tools.local");
+                        var response = client.GetAsync("https://github.com/wowdev/WoWDBDefs/releases/latest/download/all.bdbd").Result;
+                        if (response.IsSuccessStatusCode)
+                            File.WriteAllBytes(cacheLocation, response.Content.ReadAsByteArrayAsync().Result);
+                        else
+                            Console.WriteLine("Failed to download all.bdbd from GitHub: " + response.StatusCode.ToString());
+                    }
+                }
+
+                if (!File.Exists(cacheLocation))
+                    throw new Exception("all.bdbd not found");
+
+                return new FileStream(cacheLocation, FileMode.Open, FileAccess.Read, FileShare.Read);
+            }
+        }
+
+        public int LoadDefinitions(bool clearCache = false)
+        {
+            definitionLookup.Clear();
+
+            if (string.IsNullOrEmpty(SettingsManager.DefinitionDir) || !Directory.Exists(SettingsManager.DefinitionDir))
+            {
+                Console.WriteLine("Loading definitions from BDBD file");
+                using (var fs = GetBDBDStream(clearCache))
+                {
+                    var bdbd = BDBDReader.Read(fs);
+                    foreach (var entry in bdbd.tableDefinitions)
+                    {
+                        var name = Path.GetFileNameWithoutExtension(entry.Key);
+                        var definition = entry.Value.dbd;
+
+                        definitionLookup.Add(name, (entry.Key, definition));
+                    }
+
+                    Console.WriteLine("Loaded " + definitionLookup.Count + " definitions from BDBD file!");
+                }
+
+                isUsingBDBD = true;
+            }
+            else
+            {
+                var definitionsDir = SettingsManager.DefinitionDir;
+                Console.WriteLine("Reloading definitions from directory " + definitionsDir);
+
+                // lookup needs both filepath and def for DBCD to work
+                // also no longer case sensitive now
+                var definitionFiles = Directory.EnumerateFiles(definitionsDir);
+                definitionLookup = definitionFiles.ToDictionary(x => Path.GetFileNameWithoutExtension(x), x => (x, dbdReader.Read(x)), StringComparer.OrdinalIgnoreCase);
+
+                Console.WriteLine("Loaded " + definitionLookup.Count + " definitions from definitions folder!");
+            }
+
+            Console.WriteLine("Reloading relationship map");
+
+            relationshipMap = [];
+
+            foreach (var definition in definitionLookup)
+            {
+                foreach (var column in definition.Value.Definition.columnDefinitions)
+                {
+                    if (string.IsNullOrEmpty(column.Value.foreignTable))
+                        continue;
+
+                    var currentName = definition.Key + "::" + column.Key;
+                    var foreignName = column.Value.foreignTable + "::" + column.Value.foreignColumn;
+                    if (relationshipMap.TryGetValue(foreignName, out List<string>? relations))
+                    {
+                        relations.Add(currentName);
+                    }
+                    else
+                    {
+                        relationshipMap.Add(foreignName, [currentName]);
+                    }
+                }
+            }
+
+            Console.WriteLine("Reloaded relationship map: " + relationshipMap.Count + " relations");
+
+            return definitionLookup.Count;
+        }
+
+        public Stream StreamForTableName(string tableName, string build)
+        {
+            if (isUsingBDBD)
+                throw new Exception("DBD definitions were loaded from BDBD, we should never be using this function");
+
+            tableName = Path.GetFileNameWithoutExtension(tableName);
+
+            if (definitionLookup.TryGetValue(tableName, out var lookup))
+                return new FileStream(lookup.FilePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+
+            throw new FileNotFoundException("Definition for " + tableName + " not found");
+        }
+
+        public bool TryGetDefinition(string tableName, out DBDefinition definition)
+        {
+            if (definitionLookup.TryGetValue(tableName, out var lookup))
+            {
+                definition = lookup.Definition;
+                return true;
+            }
+
+            definition = default;
+            return false;
+        }
+
+        public Dictionary<string, List<string>> GetAllRelations()
+        {
+            return relationshipMap;
+        }
+
+        public List<string> GetRelationsToColumn(string foreignColumn, bool fixCase = false)
+        {
+            if (fixCase)
+            {
+                var splitCol = foreignColumn.Split("::");
+                if (splitCol.Length == 2)
+                {
+                    var results = definitionLookup.Where(x => x.Key.Equals(splitCol[0], StringComparison.CurrentCultureIgnoreCase)).Select(x => x.Key);
+                    if (results.Any())
+                    {
+                        splitCol[0] = results.First();
+                    }
+                }
+                foreignColumn = string.Join("::", splitCol);
+            }
+
+            if (!relationshipMap.TryGetValue(foreignColumn, out var relations))
+                return [];
+
+            return relations;
+        }
+
+        public string[] GetVersionsInDBD(string tableName)
+        {
+            if (!definitionLookup.TryGetValue(tableName, out var tableDefinition))
+                throw new Exception("No DBD found for table name " + tableName);
+
+            var buildList = new List<string>();
+
+            foreach (var definition in tableDefinition.Definition.versionDefinitions)
+            {
+                foreach (var build in definition.builds)
+                    buildList.Add(build.ToString());
+
+                foreach (var buildRange in definition.buildRanges)
+                {
+                    buildList.Add(buildRange.minBuild.ToString());
+                    buildList.Add(buildRange.maxBuild.ToString());
+                }
+            }
+
+            return buildList.ToArray();
+        }
+
+        public string[] GetNames()
+        {
+            return [.. definitionLookup.Keys.Order()];
+        }
+    }
+}
