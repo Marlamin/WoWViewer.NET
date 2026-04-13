@@ -141,24 +141,81 @@ namespace WoWViewer.NET.Loaders
 
                 result.startPos = vertices[0].Position;
 
+                var holesHighRes = new byte[8];
+                holesHighRes[0] = chunk.header.holesHighRes_0;
+                holesHighRes[1] = chunk.header.holesHighRes_1;
+                holesHighRes[2] = chunk.header.holesHighRes_2;
+                holesHighRes[3] = chunk.header.holesHighRes_3;
+                holesHighRes[4] = chunk.header.holesHighRes_4;
+                holesHighRes[5] = chunk.header.holesHighRes_5;
+                holesHighRes[6] = chunk.header.holesHighRes_6;
+                holesHighRes[7] = chunk.header.holesHighRes_7;
+
                 int off = c * 145;
-                for (var j = 9; j < 145; j++)
+                for (int j = 9, xx = 0, yy = 0; j < 145; j++, xx++)
                 {
-                    indices[indicesOffset++] = off + j + 8;
-                    indices[indicesOffset++] = off + j - 9;
-                    indices[indicesOffset++] = off + j;
+                    if (xx >= 8) { xx = 0; ++yy; }
+                    var isHole = true;
 
-                    indices[indicesOffset++] = off + j - 9;
-                    indices[indicesOffset++] = off + j - 8;
-                    indices[indicesOffset++] = off + j;
+                    // Check if chunk is using low-res holes
+                    if (!chunk.header.flags.HasFlag(MCNKFlags.mcnk_high_res_holes))
+                    {
+                        // Calculate current hole number
+                        var currentHole = (int)Math.Pow(2,
+                                Math.Floor(xx / 2f) * 1f +
+                                Math.Floor(yy / 2f) * 4f);
 
-                    indices[indicesOffset++] = off + j - 8;
-                    indices[indicesOffset++] = off + j + 9;
-                    indices[indicesOffset++] = off + j;
+                        // Check if current hole number should be a hole
+                        if ((chunk.header.holesLowRes & currentHole) == 0)
+                        {
+                            isHole = false;
+                        }
+                    }
+                    else
+                    {
+                        // Check if current section is a hole
+                        if (((holesHighRes[yy] >> xx) & 1) == 0)
+                        {
+                            isHole = false;
+                        }
+                    }
 
-                    indices[indicesOffset++] = off + j + 9;
-                    indices[indicesOffset++] = off + j + 8;
-                    indices[indicesOffset++] = off + j;
+                    if (isHole)
+                    {
+                        indices[indicesOffset++] = 0;
+                        indices[indicesOffset++] = 0;
+                        indices[indicesOffset++] = 0;
+
+                        indices[indicesOffset++] = 0;
+                        indices[indicesOffset++] = 0;
+                        indices[indicesOffset++] = 0;
+
+                        indices[indicesOffset++] = 0;
+                        indices[indicesOffset++] = 0;
+                        indices[indicesOffset++] = 0;
+
+                        indices[indicesOffset++] = 0;
+                        indices[indicesOffset++] = 0;
+                        indices[indicesOffset++] = 0;
+                    }
+                    else
+                    {
+                        indices[indicesOffset++] = off + j + 8;
+                        indices[indicesOffset++] = off + j - 9;
+                        indices[indicesOffset++] = off + j;
+
+                        indices[indicesOffset++] = off + j - 9;
+                        indices[indicesOffset++] = off + j - 8;
+                        indices[indicesOffset++] = off + j;
+
+                        indices[indicesOffset++] = off + j - 8;
+                        indices[indicesOffset++] = off + j + 9;
+                        indices[indicesOffset++] = off + j;
+
+                        indices[indicesOffset++] = off + j + 9;
+                        indices[indicesOffset++] = off + j + 8;
+                        indices[indicesOffset++] = off + j;
+                    }
 
                     if ((j + 1) % (9 + 8) == 0) j += 9;
                 }
