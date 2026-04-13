@@ -78,15 +78,19 @@ namespace WoWViewer.NET.Loaders
                 uint textureFileDataID = DEFAULT_TEXTURE_ID;
                 doodadBatch.mats[i].flags = model.textures[i].flags;
 
-                switch (model.textures[i].type)
+                // TODO: Classic Era still has some M2s that use filename-based texturing
+                if (model.textureFileDataIDs != null)
                 {
-                    case 0: // NONE
-                        textureFileDataID = model.textureFileDataIDs[i];
-                        break;
-                    case 1: // TEX_COMPONENT_SKIN
-                    case 2: // TEX_COMPONENT_OBJECT_SKIN
-                    case 11: // TEX_COMPONENT_MONSTER_1
-                        break;
+                    switch (model.textures[i].type)
+                    {
+                        case 0: // NONE
+                            textureFileDataID = model.textureFileDataIDs[i];
+                            break;
+                        case 1: // TEX_COMPONENT_SKIN
+                        case 2: // TEX_COMPONENT_OBJECT_SKIN
+                        case 11: // TEX_COMPONENT_MONSTER_1
+                            break;
+                    }
                 }
 
                 // Not set in TXID
