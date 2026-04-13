@@ -1,18 +1,16 @@
 ﻿using Silk.NET.OpenGL;
 using System.Numerics;
-using System.Runtime.InteropServices.Marshalling;
 using WoWFormatLib.FileProviders;
 using WoWFormatLib.FileReaders;
 using WoWFormatLib.Structs.M2;
 using WoWViewer.NET.Cache;
-using WoWViewer.NET.Renderer;
 using WoWViewer.NET.Structs;
 
 namespace WoWViewer.NET.Loaders
 {
     class M2Loader
     {
-        private static uint DEFAULT_TEXTURE_ID = 528732; // dungeons/textures/testing/color_01.blp
+        private static uint DEFAULT_TEXTURE_ID = 186184; // dungeons/textures/testing/color_01.blp
 
         public static unsafe DoodadBatch LoadM2(GL gl, uint fileDataID, uint shaderProgram)
         {
