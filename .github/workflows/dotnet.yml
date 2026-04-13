@@ -28,15 +28,15 @@ jobs:
           - kind: linux
             os: ubuntu-latest
             target: linux-x64
-            what: WoWViewer.NET/WoWViewer.NET/WoWViewer.NET.csproj
+            what: WoWViewer.NET/WoWViewer.NET.csproj
           - kind: windows
             os: windows-latest
             target: win-x64
-            what: WoWViewer.NET/WoWViewer.NET.sln
+            what: WoWViewer.NET.sln
           - kind: macOS
             os: macos-latest
             target: osx-x64
-            what: WoWViewer.NET/WoWViewer.NET/WoWViewer.NET.csproj
+            what: WoWViewer.NET/WoWViewer.NET.csproj
     runs-on: ${{ matrix.os }}
     steps:
     - uses: actions/checkout@v3

@@ -23,7 +23,12 @@ namespace WoWViewer.NET.Renderer
         private static GL? cachedGL = null;
         private static TEXFile? cachedTEX = null;
 
+        private static readonly HashSet<uint> wmosInFlight = [];
         private static readonly HashSet<uint> blpsInFlight = [];
+
+        private static readonly Lock wmoQueueLock = new();
+        private static readonly Queue<uint> wmoParseQueue = [];
+        private static readonly Queue<PreppedWMO> wmoUploadQueue = [];
 
         private static readonly Lock blpQueueLock = new();
         private static readonly Queue<uint> blpDecodeQueue = [];
@@ -49,6 +54,12 @@ namespace WoWViewer.NET.Renderer
             public int Width;
             public int Height;
             public int Level;
+        }
+
+        private struct PreppedWMO
+        {
+            public uint FileDataId;
+
         }
 
         #region M2
