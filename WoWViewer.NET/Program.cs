@@ -60,6 +60,8 @@ namespace WoWViewer.NET
         private static string buildConfig = "";
         private static string cdnConfig = "";
 
+        private static uint frameDelta = 0;
+
         static void Main(string[] args)
         {
             if (args.Length > 0)
@@ -284,6 +286,8 @@ namespace WoWViewer.NET
 
             window.Render += delta =>
             {
+                frameDelta = (uint)(delta * 1000);
+
                 if (!hasFocus || !shadersReady)
                     return;
 
@@ -492,6 +496,7 @@ namespace WoWViewer.NET
 
                     ImGui.Text("Current ADT: " + x + ", " + y);
                     ImGui.Text("RAM usage: " + (GC.GetTotalMemory(false) / 1024 / 1024).ToString() + " MB");
+                    ImGui.Text("Frame time: " + frameDelta.ToString() + " ms (FPS: " + (1000 / frameDelta).ToString() + ")");
 
                     var i = 0;
                     if (ImGui.CollapsingHeader("Loaded WMOs"))
