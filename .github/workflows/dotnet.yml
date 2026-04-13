@@ -32,7 +32,7 @@ jobs:
           - kind: windows
             os: windows-latest
             target: win-x64
-            what: WoWViewer.NET.sln
+            what: WoWViewer.NET/WoWViewer.NET.csproj
           - kind: macOS
             os: macos-latest
             target: osx-x64
