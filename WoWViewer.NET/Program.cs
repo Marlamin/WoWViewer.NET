@@ -1,3 +1,4 @@
+using CASCLib;
 using Hexa.NET.ImGui;
 using Hexa.NET.ImGuizmo;
 using Silk.NET.Input;
@@ -105,7 +106,7 @@ namespace WoWViewer.NET
                 gl = window.CreateOpenGL();
 
                 var exeLocation = Path.GetDirectoryName(AppContext.BaseDirectory);
-                if(exeLocation == null)
+                if (exeLocation == null)
                 {
                     Console.WriteLine("Could not determine executable location for shader loading");
                     return;
@@ -386,7 +387,23 @@ namespace WoWViewer.NET
                             var mapID = (int)mapRow["ID"];
                             var mapDir = (string)mapRow["Directory"];
                             var mapName = (string)mapRow["MapName_lang"];
-                            var wdtFileDataID = (int)mapRow["WdtFileDataID"];
+
+                            // Classic check
+                            var wdtFileDataID = 0;
+
+                            if (mapDB.AvailableColumns.Contains("WdtFileDataID"))
+                            {
+                                wdtFileDataID = (int)mapRow["WdtFileDataID"];
+                            }
+                            else
+                            {
+                                var jenkins = new TACTSharp.Jenkins96();
+                                var filename = "World\\Maps\\" + mapDir + "\\" + mapDir + ".wdt";
+                                var hash = jenkins.ComputeHash(filename);
+                                var entries = CASC.buildInstance.Root!.GetEntriesByLookup(hash);
+                                if(entries.Count > 0)
+                                    wdtFileDataID = (int)entries[0].fileDataID;
+                            }
 
                             if (wdtFileDataID == 0 || !CASC.FileExists((uint)wdtFileDataID))
                                 continue;
@@ -576,7 +593,7 @@ namespace WoWViewer.NET
 
                         ImGui.Text("Groups:");
                         var groups = selectedWMO.Groups;
-                        for(var i = 0; i < groups.Length; i++)
+                        for (var i = 0; i < groups.Length; i++)
                         {
                             var group = groups[i];
                             if (ImGui.Checkbox("#" + i + ": " + group, ref selectedWMO.EnabledGroups[i]))
