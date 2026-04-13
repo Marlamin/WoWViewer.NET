@@ -65,7 +65,7 @@ jobs:
   build_editor:
     name: Build Editor Release
     needs: create_release
-    runs-on: win-x64
+    runs-on: windows-latest
     steps:
     - name: Restore dependencies
       run: dotnet restore WTEditor/WTEditor.csproj
