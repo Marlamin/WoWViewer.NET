@@ -497,6 +497,8 @@ namespace WoWViewer.NET
                     ImGui.Text("Current ADT: " + x + ", " + y);
                     ImGui.Text("RAM usage: " + (GC.GetTotalMemory(false) / 1024 / 1024).ToString() + " MB");
 
+                    ImGui.Text("Visible M2s: " + sceneManager.visibleM2s + ", Visible WMOs: " + sceneManager.visibleWMOs + ", Visible ADT chunks: " + sceneManager.visibleChunks);
+
                     if(frameDelta != 0)
                         ImGui.Text("Frame time: " + frameDelta.ToString().PadLeft(3, ' ') + " ms (FPS: " + (1000 / frameDelta).ToString().PadLeft(3, ' ') + ")");
 

@@ -74,6 +74,10 @@ namespace WoWViewer.NET.Managers
         private int m2AlphaRefLoc;
         private int wmoAlphaRefLoc;
 
+        public int visibleChunks { get; private set; } = 0;
+        public int visibleWMOs { get; private set; } = 0;
+        public int visibleM2s { get; private set; } = 0;
+
         public bool SceneLoaded => loadedTiles.Count > 0;
         public string StatusMessage { get; private set; } = "";
 
@@ -466,6 +470,10 @@ namespace WoWViewer.NET.Managers
             camera.UpdateFrustum();
             var frustum = camera.GetFrustum();
 
+            visibleM2s = 0;
+            visibleWMOs = 0;
+            visibleChunks = 0;
+
             foreach (var instance in m2Instances)
             {
                 if (!RenderM2)
@@ -491,6 +499,8 @@ namespace WoWViewer.NET.Managers
 
                 SetupInstanceAttributes(m2.vao);
                 _gl.BindVertexArray(m2.vao);
+
+                visibleM2s++;
 
                 for (int batchStart = 0; batchStart < instances.Count; batchStart += MaxInstancesPerBatch)
                 {
@@ -531,14 +541,14 @@ namespace WoWViewer.NET.Managers
                 var instances = instance.Value;
                 if (instances.Count == 0) continue;
 
-                var wmoKey = instance.Key;
+                var (FileDataID, EnabledGroupHash) = instance.Key;
 
                 var firstInstance = instances[0];
 
                 if (!firstInstance.IsLoaded)
                     continue;
 
-                var wmo = WMOCache.GetOrLoad(_gl, wmoKey.FileDataID, wmoShaderProgram, firstInstance.ParentFileDataId);
+                var wmo = WMOCache.GetOrLoad(_gl, FileDataID, wmoShaderProgram, firstInstance.ParentFileDataId);
 
                 var enabledGroups = firstInstance.EnabledGroups;
 
@@ -565,6 +575,7 @@ namespace WoWViewer.NET.Managers
                     var sphere = instances[i].GetBoundingSphere();
                     if (sphere.HasValue && frustum.IsSphereVisible(sphere.Value.Center, sphere.Value.Radius))
                     {
+                        visibleWMOs++;
                         visibleIndices.Add(i);
                     }
                 }
@@ -664,6 +675,8 @@ namespace WoWViewer.NET.Managers
                         var bounds = adt.Terrain.chunkBounds[c];
                         if (!frustum.IsBoxVisible(bounds.min, bounds.max))
                             continue;
+                        else
+                            visibleChunks++;
 
                         var batch = adt.Terrain.renderBatches[c];
 
