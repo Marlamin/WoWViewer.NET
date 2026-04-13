@@ -77,7 +77,7 @@ jobs:
     - name: Restore dependencies
       run: dotnet restore WTEditor/WTEditor.csproj
     - name: Build
-      run: dotnet publish -c Release -r win-x64 -p:PublishSingleFile=true --self-contained false -f net10.0 WTEditor/WTEditor.csproj
+      run: dotnet publish -c Release -r win-x64 -p:PublishSingleFile=true --self-contained false -f net10.0-windows WTEditor/WTEditor.csproj
     - name: Test
       run: dotnet test --no-build --verbosity normal WTEditor/WTEditor.csproj
     - name: Archive Release
