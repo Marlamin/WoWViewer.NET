@@ -27,7 +27,9 @@ namespace WoWViewer.NET.Services
                 buildInstance.Settings.CDNConfig = cdnConfig;
             }
 
-            buildInstance.Settings.AdditionalCDNs = ["casc.wago.tools", "cdn.arctium.tools"];
+            buildInstance.Settings.AdditionalCDNs = ["archive.wow.tools", "casc.wago.tools", "cdn.arctium.tools"];
+            buildInstance.Settings.BlockedCDNs = ["level3.blizzard.com", "us.cdn.blizzard.com"];
+
             buildInstance.LoadConfigs(buildConfig, cdnConfig);
             if (buildInstance.BuildConfig == null || buildInstance.CDNConfig == null)
                 throw new Exception("Failed to load build configs");
