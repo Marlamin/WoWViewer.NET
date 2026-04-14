@@ -122,7 +122,10 @@ namespace WoWRenderLib.Cache
                 (originalFileDataId, preppedWMO) = item;
 
                 if (!Cache.TryGetValue(originalFileDataId, out var oldWMO))
+                {
+                    inFlight.Remove(originalFileDataId);
                     continue;
+                }
 
                 try
                 {
