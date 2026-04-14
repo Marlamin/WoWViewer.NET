@@ -78,7 +78,7 @@ namespace WoWRenderLib.Managers
         public int visibleWMOs { get; private set; } = 0;
         public int visibleM2s { get; private set; } = 0;
 
-        public bool SceneLoaded => loadedTiles.Count > 0;
+        public bool SceneLoaded => loadedTiles.Count > 0; // this won't work for WMO only maps
         public string StatusMessage { get; private set; } = "";
 
         public void Initialize(ShaderManager shaderManager, uint adtShader, uint wmoShader, uint m2Shader, uint debugShader)
@@ -244,6 +244,18 @@ namespace WoWRenderLib.Managers
                     }
                 }
             }
+
+            if(loadedTiles.Count == 0)
+            {
+                if (WMOCache.GetCacheCount() > 0)
+                    WMOCache.ReleaseAll(gl);
+
+                if(M2Cache.GetCacheCount() > 0)
+                    M2Cache.ReleaseAll(gl);
+
+                if (BLPCache.GetCacheCount() > 0)
+                    BLPCache.ReleaseAll(gl);
+            }
         }
 
         public void UpdateM2InstanceList()
@@ -302,7 +314,7 @@ namespace WoWRenderLib.Managers
 
         private void SpawnWMODoodads(WMOContainer wmoContainer)
         {
-            var wmo = WMOCache.GetOrLoad(_gl, wmoContainer.FileDataId, wmoShaderProgram, wmoContainer.ParentFileDataId);
+            var wmo = WMOCache.GetOrLoad(_gl, wmoContainer.FileDataId, wmoShaderProgram, wmoContainer.ParentFileDataId, false);
             var enabledSets = wmoContainer.EnabledDoodadSets;
 
             wmoContainer.ActiveDoodads.Clear();
@@ -420,6 +432,8 @@ namespace WoWRenderLib.Managers
             {
                 if (uuidUsers.ContainsKey(worldModel.uniqueID))
                     continue;
+
+                WMOCache.GetOrLoad(_gl, worldModel.fileDataID, wmoShaderProgram, adt.rootADTFileDataID);
 
                 var worldModelContainer = new WMOContainer(_gl, worldModel.fileDataID, wmoShaderProgram, adt.rootADTFileDataID)
                 {
@@ -621,7 +635,7 @@ namespace WoWRenderLib.Managers
                 if (!firstInstance.IsLoaded)
                     continue;
 
-                var wmo = WMOCache.GetOrLoad(_gl, FileDataID, wmoShaderProgram, firstInstance.ParentFileDataId);
+                var wmo = WMOCache.GetOrLoad(_gl, FileDataID, wmoShaderProgram, firstInstance.ParentFileDataId, false);
 
                 var enabledGroups = firstInstance.EnabledGroups;
 

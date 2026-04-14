@@ -1,4 +1,5 @@
 ﻿using Silk.NET.OpenGL;
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using WoWRenderLib.Loaders;
 using WoWRenderLib.Structs;
@@ -15,24 +16,25 @@ namespace WoWRenderLib.Cache
 
         private static readonly HashSet<uint> inFlight = [];
 
-        private static readonly Lock queueLock = new();
-        private static readonly Queue<uint> parseQueue = [];
-        private static readonly Queue<(uint originalFileDataId, PreppedWMO preppedWMO)> uploadQueue = [];
+        private static readonly ConcurrentQueue<uint> parseQueue = [];
+        private static readonly ConcurrentQueue<(uint originalFileDataId, PreppedWMO preppedWMO)> uploadQueue = [];
 
         private static CancellationTokenSource? workerCancellation;
         private static Task? workerTask;
 
-        public static WorldModel GetOrLoad(GL gl, uint fileDataId, uint shaderProgram, uint parent)
+        public static WorldModel GetOrLoad(GL gl, uint fileDataId, uint shaderProgram, uint parent, bool keepTrack = true)
         {
-            if (cachedGL == null)
-                cachedGL = gl;
+            cachedGL ??= gl;
 
             StartWorker();
 
-            if (Users.TryGetValue(fileDataId, out var users))
-                users.Add(parent);
-            else
-                Users.Add(fileDataId, [parent]);
+            if (keepTrack)
+            {
+                if (Users.TryGetValue(fileDataId, out var users))
+                    users.Add(parent);
+                else
+                    Users.Add(fileDataId, [parent]);
+            }
 
             if (Cache.TryGetValue(fileDataId, out WorldModel value))
                 return value;
@@ -52,16 +54,13 @@ namespace WoWRenderLib.Cache
 
             Cache.Add(fileDataId, placeholderWMO);
 
-            lock (queueLock)
-            {
-                if (inFlight.Contains(fileDataId))
-                    return placeholderWMO;
-
-                inFlight.Add(fileDataId);
-                parseQueue.Enqueue(fileDataId);
-
+            if (inFlight.Contains(fileDataId))
                 return placeholderWMO;
-            }
+
+            inFlight.Add(fileDataId);
+            parseQueue.Enqueue(fileDataId);
+
+            return placeholderWMO;
         }
 
         private static void StartWorker()
@@ -80,11 +79,8 @@ namespace WoWRenderLib.Cache
                 uint fileDataId = 0;
                 bool hasWork = false;
 
-                lock (queueLock)
-                {
-                    if (parseQueue.TryDequeue(out fileDataId))
-                        hasWork = true;
-                }
+                if (parseQueue.TryDequeue(out fileDataId))
+                    hasWork = true;
 
                 if (!hasWork)
                 {
@@ -95,17 +91,14 @@ namespace WoWRenderLib.Cache
                 try
                 {
                     var preppedWMO = WMOLoader.ParseWMO(fileDataId);
-
-                    lock (queueLock)
-                        uploadQueue.Enqueue((fileDataId, preppedWMO));
+                    uploadQueue.Enqueue((fileDataId, preppedWMO));
                 }
                 catch (Exception e)
                 {
                     Console.WriteLine($"!!! Error parsing WMO {fileDataId}: {e.Message}");
 
                     // Remove from in-flight set so it's not stuck in limbo
-                    lock (queueLock)
-                        inFlight.Remove(fileDataId);
+                    inFlight.Remove(fileDataId);
                 }
             }
         }
@@ -123,13 +116,10 @@ namespace WoWRenderLib.Cache
                 uint originalFileDataId;
                 PreppedWMO preppedWMO;
 
-                lock (queueLock)
-                {
-                    if (!uploadQueue.TryDequeue(out var item))
-                        break;
+                if (!uploadQueue.TryDequeue(out var item))
+                    break;
 
-                    (originalFileDataId, preppedWMO) = item;
-                }
+                (originalFileDataId, preppedWMO) = item;
 
                 if (!Cache.TryGetValue(originalFileDataId, out var oldWMO))
                     continue;
@@ -147,8 +137,7 @@ namespace WoWRenderLib.Cache
                     Console.WriteLine($"!!! Error uploading WMO {originalFileDataId}: {e.Message}");
                 }
 
-                lock (queueLock)
-                    inFlight.Remove(originalFileDataId);
+                inFlight.Remove(originalFileDataId);
 
                 uploaded++;
             }
@@ -164,8 +153,7 @@ namespace WoWRenderLib.Cache
 
         public static int GetLoadQueueCount()
         {
-            lock (queueLock)
-                return parseQueue.Count + uploadQueue.Count;
+            return parseQueue.Count + uploadQueue.Count;
         }
 
         public static void Release(GL gl, uint fileDataId, uint parent)
@@ -173,6 +161,7 @@ namespace WoWRenderLib.Cache
             if (Users.TryGetValue(fileDataId, out var users))
             {
                 users.Remove(parent);
+
                 if (users.Count == 0)
                 {
                     Users.Remove(fileDataId);

@@ -123,13 +123,7 @@ namespace WoWRenderLib.Loaders
                 for (var tm = 0; tm < batch.textureCount; tm++)
                 {
                     var textureID = model.texlookup[batch.texture + tm].textureID;
-
-                    uint textureFileDataID = DEFAULT_TEXTURE_ID;
-
-                    if (model.textureFileDataIDs != null && model.textureFileDataIDs.Length > 0 && model.textureFileDataIDs[textureID] != 0)
-                        textureFileDataID = model.textureFileDataIDs[textureID];
-
-                    materials.Add(BLPCache.GetOrLoad(gl, textureFileDataID, fileDataID));
+                    materials.Add(doodadBatch.mats[textureID].textureID);
                 }
 
                 submeshes.Add(new Structs.Submesh()
@@ -165,11 +159,11 @@ namespace WoWRenderLib.Loaders
 
             var modelindices = modelindicelist.ToArray();
 
-            doodadBatch.indices = modelindices;
+            //doodadBatch.indices = modelindices;
 
             gl.BindBuffer(BufferTargetARB.ElementArrayBuffer, doodadBatch.indiceBuffer);
-            fixed (uint* buf = doodadBatch.indices)
-                gl.BufferData(BufferTargetARB.ElementArrayBuffer, (nuint)(doodadBatch.indices.Length * sizeof(uint)), buf, GLEnum.StaticDraw);
+            fixed (uint* buf = modelindices)
+                gl.BufferData(BufferTargetARB.ElementArrayBuffer, (nuint)(modelindices.Length * sizeof(uint)), buf, GLEnum.StaticDraw);
 
             var modelvertices = new M2Vertex[model.vertices.Length];
 

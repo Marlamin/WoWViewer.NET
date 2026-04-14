@@ -102,7 +102,7 @@ namespace WoWRenderLib.Objects
 
         private Structs.WorldModel GetWMO()
         {
-            return WMOCache.GetOrLoad(_gl, FileDataId, _shaderProgram, ParentFileDataId);
+            return WMOCache.GetOrLoad(_gl, FileDataId, _shaderProgram, ParentFileDataId, false);
         }
 
         public void ToggleGroup(string name)

@@ -1,4 +1,5 @@
 ﻿using Silk.NET.OpenGL;
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using WoWRenderLib.Loaders;
 using WoWRenderLib.Structs;
@@ -7,17 +8,15 @@ namespace WoWRenderLib.Cache
 {
     public static class BLPCache
     {
-        private static readonly Dictionary<uint, uint> Cache = [];
-
         private static GL? cachedGL = null;
 
         private static readonly HashSet<uint> inFlight = [];
 
-        private static readonly Dictionary<uint, List<uint>> Users = [];
+        private static readonly ConcurrentDictionary<uint, uint> Cache = [];
+        private static readonly ConcurrentDictionary<uint, List<uint>> Users = [];
 
-        private static readonly Lock queueLock = new();
-        private static readonly Queue<uint> decodeQueue = [];
-        private static readonly Queue<DecodedBLP> uploadQueue = [];
+        private static readonly ConcurrentQueue<uint> decodeQueue = [];
+        private static readonly ConcurrentQueue<DecodedBLP> uploadQueue = [];
 
         private static CancellationTokenSource? workerCancellation;
         private static Task? workerTask;
@@ -31,7 +30,7 @@ namespace WoWRenderLib.Cache
             if (Users.TryGetValue(fileDataId, out var users))
                 users.Add(parent);
             else
-                Users.Add(fileDataId, [parent]);
+                Users.TryAdd(fileDataId, [parent]);
 
             if (Cache.TryGetValue(fileDataId, out var value))
                 return value;
@@ -53,18 +52,15 @@ namespace WoWRenderLib.Cache
             if (placeholderTextureID == uint.MaxValue)
                 placeholderTextureID = BLPLoader.CreatePlaceholderTexture(gl);
 
-            Cache.Add(fileDataId, placeholderTextureID);
+            Cache.TryAdd(fileDataId, placeholderTextureID);
 
-            lock (queueLock)
-            {
-                if (inFlight.Contains(fileDataId))
-                    return placeholderTextureID;
-
-                inFlight.Add(fileDataId);
-                decodeQueue.Enqueue(fileDataId);
-
+            if (inFlight.Contains(fileDataId))
                 return placeholderTextureID;
-            }
+
+            inFlight.Add(fileDataId);
+            decodeQueue.Enqueue(fileDataId);
+
+            return placeholderTextureID;
         }
 
         private static void StartWorker()
@@ -83,11 +79,8 @@ namespace WoWRenderLib.Cache
                 uint fileDataId = 0;
                 bool hasWork = false;
 
-                lock (queueLock)
-                {
-                    if (decodeQueue.TryDequeue(out fileDataId))
-                        hasWork = true;
-                }
+                if (decodeQueue.TryDequeue(out fileDataId))
+                    hasWork = true;
 
                 if (!hasWork)
                 {
@@ -155,8 +148,8 @@ namespace WoWRenderLib.Cache
                             IsCompressed = false
                         };
                     }
-                    lock (queueLock)
-                        uploadQueue.Enqueue(decoded);
+                    
+                    uploadQueue.Enqueue(decoded);
                 }
                 catch (Exception e)
                 {
@@ -176,12 +169,8 @@ namespace WoWRenderLib.Cache
 
             while (uploaded < maxUploadsPerFrame)
             {
-                DecodedBLP decoded;
-                lock (queueLock)
-                {
-                    if (!uploadQueue.TryDequeue(out decoded))
-                        break;
-                }
+                if (!uploadQueue.TryDequeue(out var decoded))
+                    break;
 
                 if (!Cache.TryGetValue(decoded.FileDataId, out var textureId))
                     continue;
@@ -223,8 +212,7 @@ namespace WoWRenderLib.Cache
                     }
                 }
 
-                lock (queueLock)
-                    inFlight.Remove(decoded.FileDataId);
+                inFlight.Remove(decoded.FileDataId);
 
                 uploaded++;
             }
@@ -240,8 +228,7 @@ namespace WoWRenderLib.Cache
 
         public static int GetQueueCount()
         {
-            lock (queueLock)
-                return decodeQueue.Count + uploadQueue.Count;
+            return decodeQueue.Count + uploadQueue.Count;
         }
 
         public static void Release(GL gl, uint fileDataId, uint parent)
@@ -252,11 +239,11 @@ namespace WoWRenderLib.Cache
 
                 if (users.Count == 0)
                 {
-                    Users.Remove(fileDataId);
+                    Users.TryRemove(fileDataId, out _);
                     if (Cache.TryGetValue(fileDataId, out var textureId))
                     {
                         gl.DeleteTexture(textureId);
-                        Cache.Remove(fileDataId);
+                        Cache.TryRemove(fileDataId, out _);
                     }
                 }
                 else
