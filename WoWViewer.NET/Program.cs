@@ -1,18 +1,5 @@
-using Hexa.NET.ImGui;
-using Hexa.NET.ImGuizmo;
-using Silk.NET.Input;
-using Silk.NET.Maths;
-using Silk.NET.OpenGL;
-using Silk.NET.OpenGL.Extensions.Hexa.ImGui;
 using Silk.NET.Windowing;
-using System.Numerics;
-using System.Runtime.InteropServices;
-using WoWFormatLib.FileProviders;
-using WoWViewer.NET.Cache;
-using WoWViewer.NET.Managers;
-using WoWViewer.NET.Objects;
-using WoWViewer.NET.Providers;
-using WoWViewer.NET.Services;
+using WoWRenderLib;
 
 namespace WoWViewer.NET
 {

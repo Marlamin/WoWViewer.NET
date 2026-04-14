@@ -3,7 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 18
 VisualStudioVersion = 18.4.11626.88
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "WoWViewer.NET", "WoWViewer.NET\WoWViewer.NET.csproj", "{B9B31DDC-4B81-4FA6-A9B5-85DD807DC667}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "WoWRenderLib", "WoWRenderLib\WoWRenderLib.csproj", "{B9B31DDC-4B81-4FA6-A9B5-85DD807DC667}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SceneScriptLib", "SceneScriptLib\SceneScriptLib.csproj", "{EB7D3E95-5C31-487E-B745-24F6FE36920C}"
 EndProject
@@ -20,6 +20,8 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DBCD", "DBCD\DBCD\DBCD.csproj", "{D13146D5-436B-E8B2-2020-D286F7936937}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DBCD.IO", "DBCD\DBCD.IO\DBCD.IO.csproj", "{C932AC3C-FC1C-6E93-533B-13653D9D1285}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WoWViewer.NET", "WoWViewer.NET\WoWViewer.NET.csproj", "{CD9FD77A-4293-4724-A152-D386719592F8}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -62,6 +64,10 @@ Global
 		{C932AC3C-FC1C-6E93-533B-13653D9D1285}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{C932AC3C-FC1C-6E93-533B-13653D9D1285}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{C932AC3C-FC1C-6E93-533B-13653D9D1285}.Release|Any CPU.Build.0 = Release|Any CPU
+		{CD9FD77A-4293-4724-A152-D386719592F8}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CD9FD77A-4293-4724-A152-D386719592F8}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CD9FD77A-4293-4724-A152-D386719592F8}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CD9FD77A-4293-4724-A152-D386719592F8}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

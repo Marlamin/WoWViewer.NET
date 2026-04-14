@@ -24,7 +24,7 @@
     <ProjectReference Include="..\CascLib\CascLib\CascLib.csproj" />
     <ProjectReference Include="..\TACTSharp\TACTSharp\TACTSharp.csproj" />
     <ProjectReference Include="..\WoWFormatLib\WoWFormatLib\WoWFormatLib.csproj" />
-    <ProjectReference Include="..\WoWViewer.NET\WoWViewer.NET.csproj" />
+    <ProjectReference Include="..\WoWRenderLib\WoWRenderLib.csproj" />
   </ItemGroup>
 
 </Project>
