@@ -144,8 +144,8 @@ namespace WoWRenderLib.Objects
                 return null;
 
             var wmo = GetWMO();
-            var center = (wmo.boundingBox.min + wmo.boundingBox.max) / 2f;
-            var halfExtents = (wmo.boundingBox.max - wmo.boundingBox.min) / 2f;
+            var center = (wmo.boundingBox.Min + wmo.boundingBox.Max) / 2f;
+            var halfExtents = (wmo.boundingBox.Max - wmo.boundingBox.Min) / 2f;
             var radius = halfExtents.Length();
 
             var modelMatrix = Matrix4x4.CreateScale(Scale);
@@ -164,7 +164,7 @@ namespace WoWRenderLib.Objects
                 return null;
 
             var wmo = GetWMO();
-            var box = new BoundingBox(wmo.boundingBox.min, wmo.boundingBox.max);
+            var box = new BoundingBox(wmo.boundingBox.Min, wmo.boundingBox.Max);
 
             var modelMatrix = Matrix4x4.CreateScale(Scale);
             modelMatrix *= Matrix4x4.CreateRotationZ(MathF.PI / 180f * (Rotation.Y - 270f));

@@ -310,8 +310,8 @@ namespace WoWRenderLib.Loaders
 
                 chunkBounds[c] = new BoundingBox
                 {
-                    min = chunkMinBounds,
-                    max = chunkMaxBounds
+                    Min = chunkMinBounds,
+                    Max = chunkMaxBounds
                 };
             }
 

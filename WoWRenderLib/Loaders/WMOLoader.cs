@@ -123,8 +123,8 @@ namespace WoWRenderLib.Loaders
                     groupName = groupName,
                     boundingBox = new BoundingBox()
                     {
-                        min = new Vector3(wmo.group[g].mogp.boundingBox1.X, wmo.group[g].mogp.boundingBox1.Y, wmo.group[g].mogp.boundingBox1.Z),
-                        max = new Vector3(wmo.group[g].mogp.boundingBox2.X, wmo.group[g].mogp.boundingBox2.Y, wmo.group[g].mogp.boundingBox2.Z)
+                        Min = new Vector3(wmo.group[g].mogp.boundingBox1.X, wmo.group[g].mogp.boundingBox1.Y, wmo.group[g].mogp.boundingBox1.Z),
+                        Max = new Vector3(wmo.group[g].mogp.boundingBox2.X, wmo.group[g].mogp.boundingBox2.Y, wmo.group[g].mogp.boundingBox2.Z)
                     },
                     vertexBuffer = vertexBytes,
                     indiceBuffer = indiceBytes,
@@ -242,8 +242,8 @@ namespace WoWRenderLib.Loaders
             {
                 BoundingBox = new BoundingBox()
                 {
-                    min = new Vector3(wmo.header.boundingBox1.X, wmo.header.boundingBox1.Y, wmo.header.boundingBox1.Z),
-                    max = new Vector3(wmo.header.boundingBox2.X, wmo.header.boundingBox2.Y, wmo.header.boundingBox2.Z)
+                    Min = new Vector3(wmo.header.boundingBox1.X, wmo.header.boundingBox1.Y, wmo.header.boundingBox1.Z),
+                    Max = new Vector3(wmo.header.boundingBox2.X, wmo.header.boundingBox2.Y, wmo.header.boundingBox2.Z)
                 },
                 FileDataID = fileDataID,
                 Materials = [.. mats],
@@ -260,7 +260,7 @@ namespace WoWRenderLib.Loaders
                 groupBatches = new WorldModelGroupBatches[preppedWMO.PreppedWMOGroups.Length],
                 rootWMOFileDataID = preppedWMO.FileDataID,
                 boundingBox = preppedWMO.BoundingBox,
-                boundingRadius = CalculateBoundingRadius(preppedWMO.BoundingBox.min, preppedWMO.BoundingBox.max)
+                boundingRadius = CalculateBoundingRadius(preppedWMO.BoundingBox.Min, preppedWMO.BoundingBox.Max)
             };
 
             for (var g = 0; g < preppedWMO.PreppedWMOGroups.Length; g++)

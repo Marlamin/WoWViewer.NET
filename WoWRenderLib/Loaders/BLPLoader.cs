@@ -1,6 +1,5 @@
 ﻿using BLPSharp;
 using Silk.NET.OpenGL;
-using System.Diagnostics;
 using WoWFormatLib.FileProviders;
 using WoWFormatLib.Structs.TEX;
 

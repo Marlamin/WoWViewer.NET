@@ -760,7 +760,7 @@ namespace WoWRenderLib.Managers
                     for (int c = 0; c < 256; c++)
                     {
                         var bounds = adt.Terrain.chunkBounds[c];
-                        if (!frustum.IsBoxVisible(bounds.min, bounds.max))
+                        if (!frustum.IsBoxVisible(bounds.Min, bounds.Max))
                             continue;
                         else
                             visibleChunks++;

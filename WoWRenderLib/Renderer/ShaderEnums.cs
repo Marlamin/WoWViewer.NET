@@ -1,6 +1,4 @@
-﻿using System.Collections.ObjectModel;
-
-namespace WoWRenderLib.Renderer
+﻿namespace WoWRenderLib.Renderer
 {
     public static class ShaderEnums
     {

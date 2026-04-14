@@ -3,7 +3,6 @@ using System.Numerics;
 using WoWFormatLib.FileProviders;
 using WoWFormatLib.FileReaders;
 using WoWFormatLib.Structs.M2;
-using WoWFormatLib.Structs.MDX;
 using WoWFormatLib.Structs.SKIN;
 using WoWRenderLib.Cache;
 using WoWRenderLib.Structs;
@@ -61,8 +60,8 @@ namespace WoWRenderLib.Loaders
             {
                 boundingBox = new BoundingBox()
                 {
-                    min = bbMin,
-                    max = bbMax
+                    Min = bbMin,
+                    Max = bbMax
                 },
                 boundingRadius = bbRadius
             };
@@ -138,7 +137,7 @@ namespace WoWRenderLib.Loaders
                 });
             }
 
-            doodadBatch.submeshes = [ ..submeshes];
+            doodadBatch.submeshes = [.. submeshes];
 
             doodadBatch.vao = gl.GenVertexArray();
             gl.BindVertexArray(doodadBatch.vao);

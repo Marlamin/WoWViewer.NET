@@ -35,7 +35,7 @@ namespace WoWRenderLib.Objects
 
         public override BoundingBox? GetBoundingBox()
         {
-            var box = new BoundingBox(m2.boundingBox.min, m2.boundingBox.max);
+            var box = new BoundingBox(m2.boundingBox.Min, m2.boundingBox.Max);
 
             Matrix4x4 modelMatrix;
 
