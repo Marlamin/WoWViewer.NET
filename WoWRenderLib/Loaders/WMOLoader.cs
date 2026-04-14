@@ -423,23 +423,23 @@ namespace WoWRenderLib.Loaders
                 foreach (var mat in wmo.mats)
                 {
                     if (mat.textureID1 != -1)
-                        BLPCache.GetOrLoad(gl, (uint)mat.textureID1, wmo.rootWMOFileDataID);
+                        BLPCache.Release(gl, (uint)mat.textureID1, wmo.rootWMOFileDataID);
                     if (mat.textureID2 != -1)
-                        BLPCache.GetOrLoad(gl, (uint)mat.textureID2, wmo.rootWMOFileDataID);
+                        BLPCache.Release(gl, (uint)mat.textureID2, wmo.rootWMOFileDataID);
                     if (mat.textureID3 != -1)
-                        BLPCache.GetOrLoad(gl, (uint)mat.textureID3, wmo.rootWMOFileDataID);
+                        BLPCache.Release(gl, (uint)mat.textureID3, wmo.rootWMOFileDataID);
                     if (mat.textureID4 != -1)
-                        BLPCache.GetOrLoad(gl, (uint)mat.textureID4, wmo.rootWMOFileDataID);
+                        BLPCache.Release(gl, (uint)mat.textureID4, wmo.rootWMOFileDataID);
                     if (mat.textureID5 != -1)
-                        BLPCache.GetOrLoad(gl, (uint)mat.textureID5, wmo.rootWMOFileDataID);
+                        BLPCache.Release(gl, (uint)mat.textureID5, wmo.rootWMOFileDataID);
                     if (mat.textureID6 != -1)
-                        BLPCache.GetOrLoad(gl, (uint)mat.textureID6, wmo.rootWMOFileDataID);
+                        BLPCache.Release(gl, (uint)mat.textureID6, wmo.rootWMOFileDataID);
                     if (mat.textureID7 != -1)
-                        BLPCache.GetOrLoad(gl, (uint)mat.textureID7, wmo.rootWMOFileDataID);
+                        BLPCache.Release(gl, (uint)mat.textureID7, wmo.rootWMOFileDataID);
                     if (mat.textureID8 != -1)
-                        BLPCache.GetOrLoad(gl, (uint)mat.textureID8, wmo.rootWMOFileDataID);
+                        BLPCache.Release(gl, (uint)mat.textureID8, wmo.rootWMOFileDataID);
                     if (mat.textureID9 != -1)
-                        BLPCache.GetOrLoad(gl, (uint)mat.textureID9, wmo.rootWMOFileDataID);
+                        BLPCache.Release(gl, (uint)mat.textureID9, wmo.rootWMOFileDataID);
                 }
             }
 
