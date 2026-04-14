@@ -714,6 +714,10 @@ namespace WoWRenderLib
                     var scaleZ = new Vector3(unrotated.M31, unrotated.M32, unrotated.M33).Length();
                     sceneObject.Scale = (scaleX + scaleY + scaleZ) / 3f;
                 }
+
+                // TODO Fix, this is obviously going to be very slow on models with a lot of doodads.
+                if(sceneObject is WMOContainer container)
+                    container.OnDoodadSetsChanged?.Invoke(container);
             }
 
             ImGuizmo.PopID();
@@ -742,7 +746,7 @@ namespace WoWRenderLib
             });
         }
 
-        private static Vector3 QuaternionToEuler(Quaternion q)
+        public static Vector3 QuaternionToEuler(Quaternion q)
         {
             Vector3 euler;
 

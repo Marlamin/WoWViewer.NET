@@ -12,6 +12,12 @@ namespace WoWRenderLib.Objects
         private bool[]? enabledGroups;
         private bool[]? enabledDoodadSets;
 
+        public bool DoodadsSpawned = false;
+
+        public List<M2Container> ActiveDoodads = [];
+
+        public Action<WMOContainer>? OnDoodadSetsChanged { get; set; }
+
         public string[] DoodadSets
         {
             get
@@ -129,6 +135,7 @@ namespace WoWRenderLib.Objects
         public void ToggleDoodadSet(int index)
         {
             EnabledDoodadSets[index] = !EnabledDoodadSets[index];
+            OnDoodadSetsChanged?.Invoke(this);
         }
 
         public override BoundingSphere? GetBoundingSphere()

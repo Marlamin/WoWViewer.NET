@@ -220,6 +220,13 @@ namespace WoWRenderLib.Managers
                                     }
                                     else
                                     {
+                                        foreach (var doodad in wmo.ActiveDoodads)
+                                        {
+                                            SceneObjects.Remove(doodad);
+                                            M2Cache.Release(_gl, doodad.FileDataId, doodad.ParentFileDataId);
+                                        }
+                                        wmo.ActiveDoodads.Clear();
+
                                         SceneObjects.Remove(wmo);
                                         WMOCache.Release(_gl, wmo.FileDataId, wmo.ParentFileDataId);
                                         uuidUsers.Remove(wmo.UniqueID);
@@ -293,6 +300,52 @@ namespace WoWRenderLib.Managers
             }
         }
 
+        private void SpawnWMODoodads(WMOContainer wmoContainer)
+        {
+            var wmo = WMOCache.GetOrLoad(_gl, wmoContainer.FileDataId, wmoShaderProgram, wmoContainer.ParentFileDataId);
+            var enabledSets = wmoContainer.EnabledDoodadSets;
+
+            wmoContainer.ActiveDoodads.Clear();
+
+            foreach (var doodad in wmo.doodads)
+            {
+                if (!enabledSets[doodad.doodadSet])
+                    continue;
+
+                var m2Container = new M2Container(_gl, doodad.filedataid, m2ShaderProgram, wmoContainer.ParentFileDataId)
+                {
+                    ParentWMO = wmoContainer,
+                    LocalPosition = doodad.position,
+                    LocalRotation = doodad.rotation,
+                    LocalScale = doodad.scale,
+                };
+
+                lock(SceneObjectLock)
+                    SceneObjects.Add(m2Container);
+
+                wmoContainer.ActiveDoodads.Add(m2Container);
+            }
+        }
+
+        public void RefreshWMODoodads(WMOContainer wmoContainer)
+        {
+            if (!wmoContainer.IsLoaded)
+                return;
+
+            lock (SceneObjectLock)
+            {
+                foreach (var doodad in wmoContainer.ActiveDoodads)
+                {
+                    SceneObjects.Remove(doodad);
+                    M2Cache.Release(_gl, doodad.FileDataId, doodad.ParentFileDataId);
+                }
+
+                SpawnWMODoodads(wmoContainer);
+
+                UpdateInstanceList();
+            }
+        }
+
         public bool ProcessQueue()
         {
             // If no ADTs are queued, but other files still are, we return true (and not dequeue tiles) to keep calling this function over and over to handle the various uploads, because these need to be called from this thread, but this does block new ADTs from loading until these are done which isn't ideal.
@@ -358,48 +411,57 @@ namespace WoWRenderLib.Managers
 
             timer.Stop();
 
+            var adtContainer = new ADTContainer(_gl, adt, mapTile, adtShaderProgram);
+
             lock (SceneObjectLock)
-            {
-                var adtContainer = new ADTContainer(_gl, adt, mapTile, adtShaderProgram);
                 SceneObjects.Add(adtContainer);
 
-                foreach (var worldModel in adt.worldModelBatches)
+            foreach (var worldModel in adt.worldModelBatches)
+            {
+                if (uuidUsers.ContainsKey(worldModel.uniqueID))
+                    continue;
+
+                var worldModelContainer = new WMOContainer(_gl, worldModel.fileDataID, wmoShaderProgram, adt.rootADTFileDataID)
                 {
-                    if (uuidUsers.ContainsKey(worldModel.uniqueID))
-                        continue;
+                    Position = worldModel.position,
+                    Rotation = worldModel.rotation,
+                    Scale = worldModel.scale == 0 ? 1 : worldModel.scale,
+                    UniqueID = worldModel.uniqueID,
+                    OnDoodadSetsChanged = RefreshWMODoodads
+                };
 
-                    var worldModelContainer = new WMOContainer(_gl, worldModel.fileDataID, wmoShaderProgram, adt.rootADTFileDataID)
-                    {
-                        Position = worldModel.position,
-                        Rotation = worldModel.rotation,
-                        Scale = worldModel.scale == 0 ? 1 : worldModel.scale,
-                        UniqueID = worldModel.uniqueID
-                    };
+                worldModelContainer.DoodadSetsToEnable.AddRange(worldModel.doodadSetIDs);
 
-                    worldModelContainer.DoodadSetsToEnable.AddRange(worldModel.doodadSetIDs);
-
+                lock (SceneObjectLock)
                     SceneObjects.Add(worldModelContainer);
 
-                    if (uuidUsers.TryGetValue(worldModel.uniqueID, out var count))
-                        uuidUsers[worldModel.uniqueID] = count + 1;
-                    else
-                        uuidUsers[worldModel.uniqueID] = 1;
-                }
-
-                foreach (var doodad in adt.doodads)
-                {
-                    var doodadContainer = new M2Container(_gl, doodad.fileDataID, m2ShaderProgram, adt.rootADTFileDataID)
-                    {
-                        Position = doodad.position,
-                        Rotation = doodad.rotation,
-                        Scale = doodad.scale
-                    };
-
-                    SceneObjects.Add(doodadContainer);
-                }
-
-                UpdateInstanceList();
+                if (uuidUsers.TryGetValue(worldModel.uniqueID, out var count))
+                    uuidUsers[worldModel.uniqueID] = count + 1;
+                else
+                    uuidUsers[worldModel.uniqueID] = 1;
             }
+
+            var wmosToSpawn = SceneObjects.OfType<WMOContainer>().Where(w => w.IsLoaded && !w.DoodadsSpawned).ToList();
+            foreach (var wmoContainer in wmosToSpawn)
+            {
+                SpawnWMODoodads(wmoContainer);
+                wmoContainer.DoodadsSpawned = true;
+            }
+
+            foreach (var doodad in adt.doodads)
+            {
+                var doodadContainer = new M2Container(_gl, doodad.fileDataID, m2ShaderProgram, adt.rootADTFileDataID)
+                {
+                    Position = doodad.position,
+                    Rotation = doodad.rotation,
+                    Scale = doodad.scale
+                };
+
+                lock (SceneObjectLock)
+                    SceneObjects.Add(doodadContainer);
+            }
+
+            UpdateInstanceList();
 
             loadedTiles.Add(mapTile);
 
@@ -424,6 +486,10 @@ namespace WoWRenderLib.Managers
                         continue;
 
                     if (!RenderM2 && sceneObject is M2Container)
+                        continue;
+
+                    // Make doodads unselectable
+                    if (sceneObject is M2Container m2container && m2container.ParentWMO != null)
                         continue;
 
                     if (sceneObject.IsSelected)
@@ -801,14 +867,34 @@ namespace WoWRenderLib.Managers
             _gl.BindBuffer(BufferTargetARB.ArrayBuffer, 0);
         }
 
-        private Matrix4x4 BuildModelMatrix(Container3D container)
+        private static Matrix4x4 BuildModelMatrix(Container3D container)
         {
-            var modelMatrix = Matrix4x4.CreateScale(container.Scale);
-            modelMatrix *= Matrix4x4.CreateRotationX(MathF.PI / 180f * container.Rotation.Z);
-            modelMatrix *= Matrix4x4.CreateRotationY(MathF.PI / 180f * container.Rotation.X);
-            modelMatrix *= Matrix4x4.CreateRotationZ(MathF.PI / 180f * (container.Rotation.Y + 90f));
-            modelMatrix *= Matrix4x4.CreateTranslation(container.Position.X, container.Position.Z * -1, container.Position.Y);
-            modelMatrix *= Matrix4x4.CreateRotationZ(MathF.PI / 180f * -270f);
+            Matrix4x4 modelMatrix;
+
+            if (container is M2Container m2Container && m2Container.ParentWMO != null)
+            {
+                modelMatrix = Matrix4x4.CreateScale(m2Container.LocalScale);
+                modelMatrix *= Matrix4x4.CreateFromQuaternion(m2Container.LocalRotation);
+                modelMatrix *= Matrix4x4.CreateTranslation(m2Container.LocalPosition.X, m2Container.LocalPosition.Y, m2Container.LocalPosition.Z);
+
+                var parentMatrix = Matrix4x4.CreateScale(m2Container.ParentWMO.Scale);
+                parentMatrix *= Matrix4x4.CreateRotationX(MathF.PI / 180f * m2Container.ParentWMO.Rotation.Z);
+                parentMatrix *= Matrix4x4.CreateRotationY(MathF.PI / 180f * m2Container.ParentWMO.Rotation.X);
+                parentMatrix *= Matrix4x4.CreateRotationZ(MathF.PI / 180f * (m2Container.ParentWMO.Rotation.Y + 90f));
+                parentMatrix *= Matrix4x4.CreateTranslation(m2Container.ParentWMO.Position.X, m2Container.ParentWMO.Position.Z * -1, m2Container.ParentWMO.Position.Y);
+                modelMatrix = modelMatrix * parentMatrix;
+                modelMatrix *= Matrix4x4.CreateRotationZ(MathF.PI / 180f * -270f);
+            }
+            else
+            {
+                modelMatrix = Matrix4x4.CreateScale(container.Scale);
+                modelMatrix *= Matrix4x4.CreateRotationX(MathF.PI / 180f * container.Rotation.Z);
+                modelMatrix *= Matrix4x4.CreateRotationY(MathF.PI / 180f * container.Rotation.X);
+                modelMatrix *= Matrix4x4.CreateRotationZ(MathF.PI / 180f * (container.Rotation.Y + 90f));
+                modelMatrix *= Matrix4x4.CreateTranslation(container.Position.X, container.Position.Z * -1, container.Position.Y);
+                modelMatrix *= Matrix4x4.CreateRotationZ(MathF.PI / 180f * -270f);
+            }
+
             return modelMatrix;
         }
 
