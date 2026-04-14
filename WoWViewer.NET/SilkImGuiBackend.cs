@@ -5,8 +5,9 @@ using Silk.NET.OpenGL;
 using Silk.NET.OpenGL.Extensions.Hexa.ImGui;
 using Silk.NET.Windowing;
 using System.Numerics;
+using WoWRenderLib;
 
-namespace WoWRenderLib
+namespace WoWViewer.NET
 {
     public class SilkImGuiBackend : IImGuiBackend
     {

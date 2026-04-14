@@ -3,8 +3,9 @@ using Silk.NET.Maths;
 using Silk.NET.OpenGL;
 using Silk.NET.Windowing;
 using System.Diagnostics;
+using WoWRenderLib;
 
-namespace WoWRenderLib
+namespace WoWViewer.NET
 {
     public class SilkWindowHost
     {
