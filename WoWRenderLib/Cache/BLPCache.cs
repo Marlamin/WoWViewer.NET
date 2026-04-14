@@ -148,7 +148,7 @@ namespace WoWRenderLib.Cache
                             IsCompressed = false
                         };
                     }
-                    
+
                     uploadQueue.Enqueue(decoded);
                 }
                 catch (Exception e)

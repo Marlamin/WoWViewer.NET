@@ -717,7 +717,7 @@ namespace WoWRenderLib
                 }
 
                 // TODO Fix, this is obviously going to be very slow on models with a lot of doodads.
-                if(sceneObject is WMOContainer container)
+                if (sceneObject is WMOContainer container)
                     container.OnDoodadSetsChanged?.Invoke(container);
             }
 

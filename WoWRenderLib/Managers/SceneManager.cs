@@ -245,12 +245,12 @@ namespace WoWRenderLib.Managers
                 }
             }
 
-            if(loadedTiles.Count == 0)
+            if (loadedTiles.Count == 0)
             {
                 if (WMOCache.GetCacheCount() > 0)
                     WMOCache.ReleaseAll(gl);
 
-                if(M2Cache.GetCacheCount() > 0)
+                if (M2Cache.GetCacheCount() > 0)
                     M2Cache.ReleaseAll(gl);
 
                 if (BLPCache.GetCacheCount() > 0)
@@ -332,7 +332,7 @@ namespace WoWRenderLib.Managers
                     LocalScale = doodad.scale,
                 };
 
-                lock(SceneObjectLock)
+                lock (SceneObjectLock)
                     SceneObjects.Add(m2Container);
 
                 wmoContainer.ActiveDoodads.Add(m2Container);
@@ -608,12 +608,12 @@ namespace WoWRenderLib.Managers
 
                         SwitchBlendMode((int)submesh.blendType, _gl, m2AlphaRefLoc);
 
-                        for(var m = 0; m < submesh.material.Length; m++)
+                        for (var m = 0; m < submesh.material.Length; m++)
                         {
                             _gl.ActiveTexture(TextureUnit.Texture0 + m);
                             _gl.BindTexture(TextureTarget.Texture2D, submesh.material[m]);
                         }
-                  
+
                         _gl.DrawElementsInstanced(PrimitiveType.Triangles, submesh.numFaces, DrawElementsType.UnsignedInt, (void*)(submesh.firstFace * 4), (uint)batchSize);
                         _gl.BindTexture(TextureTarget.Texture2D, 0);
                     }
