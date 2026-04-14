@@ -3,6 +3,8 @@ using System.Numerics;
 using WoWFormatLib.FileProviders;
 using WoWFormatLib.FileReaders;
 using WoWFormatLib.Structs.M2;
+using WoWFormatLib.Structs.MDX;
+using WoWFormatLib.Structs.SKIN;
 using WoWRenderLib.Cache;
 using WoWRenderLib.Structs;
 using static WoWRenderLib.Renderer.ShaderEnums;
@@ -101,50 +103,48 @@ namespace WoWRenderLib.Loaders
             }
 
             // Submeshes
-            doodadBatch.submeshes = new Submesh[model.skins[0].submeshes.Length];
-            for (var i = 0; i < model.skins[0].submeshes.Length; i++)
+            var submeshes = new List<Structs.Submesh>();
+            for (int i = 0; i < model.skins[0].textureunit.Length; i++)
             {
-                uint material = 0;
-                uint blendType = 0;
-                var firstFace = model.skins[0].submeshes[i].startTriangle;
-                var numFaces = model.skins[0].submeshes[i].nTriangles;
-                uint vertexShaderID = 0;
-                uint pixelShaderID = 0;
+                var batch = model.skins[0].textureunit[i];
+                var skinSection = model.skins[0].submeshes[batch.submeshIndex];
 
-                for (var tu = 0; tu < model.skins[0].textureunit.Length; tu++)
+                // TODO: Support
+                if (batch.flags.HasFlag(TextureUnitFlags.ProjectedTexture))
+                    continue;
+
+                var materials = new List<uint>();
+                var firstFace = skinSection.startTriangle;
+                var numFaces = skinSection.nTriangles;
+                var blendType = model.renderflags[batch.renderFlagsIndex].blendingMode;
+                var vertexShaderID = (uint)GetVertexShaderID(batch.textureCount, batch.shaderID);
+                var pixelShaderID = (uint)GetPixelShaderID(batch.textureCount, batch.shaderID);
+
+                for (var tm = 0; tm < batch.textureCount; tm++)
                 {
-                    if (model.skins[0].textureunit[tu].submeshIndex != i)
-                        continue;
-
-                    var textureUnit = model.skins[0].textureunit[tu];
-
-                    blendType = model.renderflags[textureUnit.renderFlagsIndex].blendingMode;
-                    vertexShaderID = (uint)GetVertexShaderID(textureUnit.mode, textureUnit.shaderID);
-                    pixelShaderID = (uint)GetPixelShaderID(textureUnit.mode, textureUnit.shaderID);
-
-                    var textureID = model.texlookup[textureUnit.texture].textureID;
+                    var textureID = model.texlookup[batch.texture + tm].textureID;
 
                     uint textureFileDataID = DEFAULT_TEXTURE_ID;
 
                     if (model.textureFileDataIDs != null && model.textureFileDataIDs.Length > 0 && model.textureFileDataIDs[textureID] != 0)
                         textureFileDataID = model.textureFileDataIDs[textureID];
 
-                    material = BLPCache.GetOrLoad(gl, textureFileDataID, fileDataID);
-
-                    break;
+                    materials.Add(BLPCache.GetOrLoad(gl, textureFileDataID, fileDataID));
                 }
 
-                doodadBatch.submeshes[i] = new Submesh()
+                submeshes.Add(new Structs.Submesh()
                 {
                     firstFace = firstFace,
                     numFaces = numFaces,
-                    material = material,
+                    material = [.. materials],
                     blendType = blendType,
                     index = i,
                     vertexShaderID = vertexShaderID,
                     pixelShaderID = pixelShaderID
-                };
+                });
             }
+
+            doodadBatch.submeshes = [ ..submeshes];
 
             doodadBatch.vao = gl.GenVertexArray();
             gl.BindVertexArray(doodadBatch.vao);

@@ -540,6 +540,8 @@ namespace WoWRenderLib.Managers
             visibleWMOs = 0;
             visibleChunks = 0;
 
+            // TODO Sort M2/WMO draw calls by needing alpha or not
+
             foreach (var instance in m2Instances)
             {
                 if (!RenderM2)
@@ -592,11 +594,12 @@ namespace WoWRenderLib.Managers
 
                         SwitchBlendMode((int)submesh.blendType, _gl, m2AlphaRefLoc);
 
-                        _gl.ActiveTexture(TextureUnit.Texture0);
-                        _gl.BindTexture(TextureTarget.Texture2D, submesh.material);
-
-                        // TODO: Texture2/Texture3
-
+                        for(var m = 0; m < submesh.material.Length; m++)
+                        {
+                            _gl.ActiveTexture(TextureUnit.Texture0 + m);
+                            _gl.BindTexture(TextureTarget.Texture2D, submesh.material[m]);
+                        }
+                  
                         _gl.DrawElementsInstanced(PrimitiveType.Triangles, submesh.numFaces, DrawElementsType.UnsignedInt, (void*)(submesh.firstFace * 4), (uint)batchSize);
                         _gl.BindTexture(TextureTarget.Texture2D, 0);
                     }

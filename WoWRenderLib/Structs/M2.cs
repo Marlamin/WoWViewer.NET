@@ -33,7 +33,7 @@ namespace WoWRenderLib.Structs
     {
         public readonly uint firstFace { get; init; }
         public readonly uint numFaces { get; init; }
-        public readonly uint material { get; init; }
+        public readonly uint[] material { get; init; }
         public readonly uint blendType { get; init; }
         public readonly int index { get; init; }
         public readonly uint vertexShaderID { get; init; }
