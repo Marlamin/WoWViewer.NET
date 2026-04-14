@@ -3,9 +3,7 @@ using System.Numerics;
 using WoWFormatLib.FileProviders;
 using WoWFormatLib.FileReaders;
 using WoWFormatLib.Structs.ADT;
-using WoWFormatLib.Structs.WMO;
 using WoWRenderLib.Cache;
-using WoWRenderLib.Renderer;
 using WoWRenderLib.Structs;
 
 namespace WoWRenderLib.Loaders
@@ -367,9 +365,9 @@ namespace WoWRenderLib.Loaders
                 else
                 {
                     var mwdrEntry = adt.objects.worldModelDoodadRefs[wmodelentry.doodadSet];
-                    for(var i = 0; i < mwdrEntry.begin; i++)
+                    for (var i = 0; i < mwdrEntry.begin; i++)
                     {
-                        if(mwdrEntry.end <= i)
+                        if (mwdrEntry.end <= i)
                             break;
 
                         doodadSets.Add(adt.objects.worldModelDoodadSets[i]);

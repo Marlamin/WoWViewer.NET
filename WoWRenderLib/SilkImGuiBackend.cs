@@ -1,10 +1,10 @@
-﻿using System.Numerics;
-using Hexa.NET.ImGui;
+﻿using Hexa.NET.ImGui;
 using Hexa.NET.ImGuizmo;
 using Silk.NET.Input;
 using Silk.NET.OpenGL;
 using Silk.NET.OpenGL.Extensions.Hexa.ImGui;
 using Silk.NET.Windowing;
+using System.Numerics;
 
 namespace WoWRenderLib
 {
@@ -27,7 +27,7 @@ namespace WoWRenderLib
             controller = new ImGuiController(
                 gl,
                 window,
-                input, 
+                input,
                 null,
                 () => ImGui.GetIO().ConfigFlags |= ImGuiConfigFlags.DockingEnable
             );

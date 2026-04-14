@@ -1,15 +1,11 @@
-﻿using System;
-using System.Collections;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.Numerics;
-using System.Runtime.InteropServices;
-using System.Text;
-using Hexa.NET.ImGui;
+﻿using Hexa.NET.ImGui;
 using Hexa.NET.ImGuizmo;
 using Silk.NET.Input;
 using Silk.NET.Maths;
 using Silk.NET.OpenGL;
+using System.Diagnostics;
+using System.Numerics;
+using System.Runtime.InteropServices;
 using WoWFormatLib.FileProviders;
 using WoWRenderLib.Cache;
 using WoWRenderLib.Managers;
@@ -886,9 +882,6 @@ namespace WoWRenderLib
             }
             wasSpacePressed = spacePressed;
         }
-#endregion
-
-
-
+        #endregion
     }
 }

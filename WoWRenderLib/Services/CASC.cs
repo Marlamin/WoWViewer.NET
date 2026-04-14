@@ -10,10 +10,10 @@ namespace WoWRenderLib.Services
 
         public static async Task Initialize(string wowDir, string wowProduct, string buildConfig, string cdnConfig)
         {
-            if(string.IsNullOrEmpty(wowDir) || !Directory.Exists(wowDir))
+            if (string.IsNullOrEmpty(wowDir) || !Directory.Exists(wowDir))
                 throw new Exception("Invalid WoW directory");
 
-            if(string.IsNullOrEmpty(wowProduct) || !wowProduct.StartsWith("wow"))
+            if (string.IsNullOrEmpty(wowProduct) || !wowProduct.StartsWith("wow"))
                 throw new Exception("Invalid WoW product");
 
             buildInstance = new BuildInstance();
@@ -23,7 +23,7 @@ namespace WoWRenderLib.Services
             buildInstance.Settings.Region = "us";
             buildInstance.Settings.RootMode = RootInstance.LoadMode.Normal;
 
-            if(string.IsNullOrEmpty(buildConfig) || string.IsNullOrEmpty(cdnConfig))
+            if (string.IsNullOrEmpty(buildConfig) || string.IsNullOrEmpty(cdnConfig))
             {
                 // TODO: Retrieve from Ribbit
             }

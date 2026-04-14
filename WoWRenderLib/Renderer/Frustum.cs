@@ -72,7 +72,7 @@ namespace WoWRenderLib.Renderer
             for (int i = 0; i < 6; i++)
             {
                 var plane = planes[i];
-                
+
                 var positiveVertex = new Vector3(
                     plane.Normal.X >= 0 ? max.X : min.X,
                     plane.Normal.Y >= 0 ? max.Y : min.Y,

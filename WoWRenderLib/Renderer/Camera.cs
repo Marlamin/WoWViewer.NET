@@ -69,7 +69,7 @@ public class Camera
         //Console.WriteLine("ScreenX: " + screenX + " ScreenY: " + screenY);
         (float x, float y) = ((2.0f * screenX) / screenWidth - 1.0f, 1.0f - (2.0f * screenY) / screenHeight);
 
-       // Console.WriteLine("Normalized Device Coordinates: " + x + ", " + y);
+        // Console.WriteLine("Normalized Device Coordinates: " + x + ", " + y);
 
         var clipCoords = new Vector4(x, y, -1.0f, 1.0f);
 

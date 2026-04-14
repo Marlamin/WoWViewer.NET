@@ -16,7 +16,7 @@ namespace WoWRenderLib.Structs
         public Vector4 Color3;
     }
 
-    public  struct WMOMaterial
+    public struct WMOMaterial
     {
         public int textureID1;
         public int textureID2;
@@ -115,7 +115,7 @@ namespace WoWRenderLib.Structs
     public readonly struct PreppedWMOGroupBatch
     {
         public readonly int MaterialID { get; init; }
-        public readonly uint FirstFace { get; init;  }
+        public readonly uint FirstFace { get; init; }
         public readonly int NumFaces { get; init; }
 
     }

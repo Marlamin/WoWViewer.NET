@@ -14,7 +14,7 @@ namespace WoWRenderLib.Raycasting
         }
 
         public Vector3 Center => (Min + Max) * 0.5f;
-        
+
         public Vector3 Size => Max - Min;
 
         public static BoundingBox Transform(BoundingBox box, Matrix4x4 transform)

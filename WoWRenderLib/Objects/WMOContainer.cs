@@ -55,11 +55,11 @@ namespace WoWRenderLib.Objects
                     enabledDoodadSets = new bool[wmo.doodadSets.Length];
                     for (int i = 0; i < wmo.doodadSets.Length; i++)
                     {
-                        if(i == 0) // todo: check if this is a string check like below or not
-                        //if (wmo.doodadSets[i].Equals("Set_$DefaultGlobal", StringComparison.OrdinalIgnoreCase))
+                        if (i == 0) // todo: check if this is a string check like below or not
+                                    //if (wmo.doodadSets[i].Equals("Set_$DefaultGlobal", StringComparison.OrdinalIgnoreCase))
                             enabledDoodadSets[i] = true;
                         else
-                            if(DoodadSetsToEnable.Count > 0 && DoodadSetsToEnable.Contains((uint)i))
+                            if (DoodadSetsToEnable.Count > 0 && DoodadSetsToEnable.Contains((uint)i))
                                 enabledDoodadSets[i] = true;
                             else
                                 enabledDoodadSets[i] = false;
