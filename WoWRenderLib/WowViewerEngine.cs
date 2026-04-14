@@ -153,12 +153,6 @@ namespace WoWRenderLib
             shaderManager = new ShaderManager(gl, Path.Combine(exeLocation, "Shaders"));
             sceneManager = new SceneManager(gl, shaderManager);
 
-#if DEBUG
-            Evergine.Bindings.RenderDoc.RenderDoc.Load(out Evergine.Bindings.RenderDoc.RenderDoc renderDoc);
-#endif
-
-            // gl = null;
-
             imgui.Initialize();
 
             var err = gl.GetError();

@@ -1,15 +1,8 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.Numerics;
-using System.Text;
-using Hexa.NET.ImGuizmo;
-using Silk.NET.Input;
+﻿using Silk.NET.Input;
 using Silk.NET.Maths;
 using Silk.NET.OpenGL;
 using Silk.NET.Windowing;
-using TACTSharp;
-using WoWRenderLib.Managers;
+using System.Diagnostics;
 
 namespace WoWRenderLib
 {
@@ -42,6 +35,10 @@ namespace WoWRenderLib
             windowOptions.Size = new Vector2D<int>(1920, 1080);
             windowOptions.Title = "WoWRenderLib";
             window = Window.Create(windowOptions);
+
+#if DEBUG
+            Evergine.Bindings.RenderDoc.RenderDoc.Load(out Evergine.Bindings.RenderDoc.RenderDoc renderDoc);
+#endif
 
             window.Load += OnLoad;
             window.FramebufferResize += OnResize;
