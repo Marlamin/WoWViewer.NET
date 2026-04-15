@@ -237,14 +237,23 @@ namespace WoWRenderLib
 
         public void Update(double deltaTime, InputFrame input)
         {
-            imgui?.Update((float)deltaTime);
+            if (renderImGUI)
+            {
+                imgui?.Update((float)deltaTime);
 
-            var io = ImGui.GetIO();
-            bool gizmoInUse = gizmoWasUsing || gizmoWasOver;
+                bool gizmoInUse = gizmoWasUsing || gizmoWasOver;
 
-            HandleMouseLook(input, io, gizmoInUse, (float)deltaTime);
-            HandleClickSelection(input, io, gizmoInUse);
-            HandleKeyboardMovement(input, (float)deltaTime);
+                var io = ImGui.GetIO();
+                HandleMouseLook(input, io, gizmoInUse, (float)deltaTime);
+                HandleClickSelection(input, io, gizmoInUse);
+                HandleKeyboardMovement(input, (float)deltaTime);
+            }
+            else
+            {   HandleMouseLook(input, new ImGuiIOPtr(), false, (float)deltaTime);
+                HandleClickSelection(input, new ImGuiIOPtr(), false);
+                HandleKeyboardMovement(input, (float)deltaTime);
+            }
+
         }
 
         public void Render(double deltaTime)
@@ -310,7 +319,8 @@ namespace WoWRenderLib
             if (shadersReady)
             {
                 sceneManager.RenderScene(activeCamera, out bool renderGizmoWasUsing, out bool renderGizmoWasOver);
-                RenderGizmo();
+                if (renderImGUI)
+                    RenderGizmo();
                 sceneManager.RenderDebug(activeCamera, out bool debugGizmoWasUsing, out bool debugGizmoWasOver);
 
                 gizmoWasUsing = renderGizmoWasUsing || debugGizmoWasUsing;
@@ -875,7 +885,9 @@ namespace WoWRenderLib
         private void HandleMouseLook(InputFrame input, ImGuiIOPtr io, bool gizmoInUse, float deltaTime)
         {
             // Handle mouse look with right click
-            if (input.RightMouseDown && !io.WantCaptureMouse && !gizmoInUse)
+            bool imguiCapturingMouse = io.IsNull ? false : io.WantCaptureMouse;
+
+            if (input.RightMouseDown && !imguiCapturingMouse && !gizmoInUse)
             {
                 var currentMousePos = input.MousePosition;
 
@@ -904,14 +916,16 @@ namespace WoWRenderLib
         {
             bool mouseDownThisFrame = input.LeftMouseDown;
 
-            if (mouseDownThisFrame && !wasMouseDown && !io.WantCaptureMouse && !gizmoInUse)
+            bool imguiCapturingMouse = io.IsNull ? false : io.WantCaptureMouse;
+
+            if (mouseDownThisFrame && !wasMouseDown && !imguiCapturingMouse && !gizmoInUse)
             {
                 MouseDownPosition = input.MousePosition;
             }
 
             if (!mouseDownThisFrame && wasMouseDown)
             {
-                if (MouseDownPosition.HasValue && !io.WantCaptureMouse)
+                if (MouseDownPosition.HasValue && !imguiCapturingMouse)
                 {
                     var dragDistance = Vector2.Distance(MouseDownPosition.Value, input.MousePosition);
 
