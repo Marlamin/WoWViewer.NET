@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "WoWRenderLib.DX11": {
+      "commandName": "Project",
+      "commandLineArgs": "\"C:\\World of Warcraft\" wowt"
+    }
+  }
+}

@@ -449,6 +449,15 @@ namespace WoWRenderLib
 
                         ImGui.Combo("WoW Product", ref _currentProduct, _products, _products.Length);
 
+                        if (_currentProduct != -1)
+                        {
+                            var selectedProduct = _productList.ElementAt(_currentProduct);
+                            _wowConfig.wowProduct = selectedProduct.Key;
+                            _wowConfig.buildConfig = selectedProduct.Value.buildConfig;
+                            _wowConfig.cdnConfig = selectedProduct.Value.cdnConfig;
+
+                        }
+
                         if (ImGui.Button("Load (and wait a few seconds)"))
                             StartCASCInitialization();
 
