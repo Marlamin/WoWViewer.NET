@@ -19,7 +19,7 @@ jobs:
           prerelease: false
           generate_release_notes: false
   build:
-    name: Build Release
+    name: Build Release (OpenGL)
     needs: create_release
     strategy:
       matrix:
@@ -62,6 +62,42 @@ jobs:
       uses: softprops/action-gh-release@v0.1.13
       with:
         files: ${{ github.workspace }}/Release-${{ matrix.target }}.zip
+  build_dx:
+    name: Build Release (DirectX11)
+    needs: create_release
+    strategy:
+      matrix:
+        kind: ['windows']
+        include:
+          - kind: windows
+            os: windows-latest
+            target: win-x64
+            what: WoWViewer.NET.DX11/WoWViewer.NET.DX11.csproj
+    runs-on: ${{ matrix.os }}
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        submodules: recursive
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v3
+      with:
+        dotnet-version: 10.0.x
+    - name: Restore dependencies
+      run: dotnet restore ${{ matrix.what }}
+    - name: Build
+      run: dotnet publish -c Release -r ${{ matrix.target }} -p:PublishSingleFile=true --self-contained false -f net10.0 ${{ matrix.what }}
+    - name: Test
+      run: dotnet test --no-build --verbosity normal ${{ matrix.what }}
+    - name: Archive Release
+      uses: thedoctor0/zip-release@main
+      with:
+        directory: ${{ github.workspace }}/WoWViewer.NET.DX11/bin/Release/net10.0/${{ matrix.target }}/publish
+        type: 'zip'
+        filename: ${{ github.workspace }}/Release-${{ matrix.target }}-DX11.zip
+    - name: Release
+      uses: softprops/action-gh-release@v0.1.13
+      with:
+        files: ${{ github.workspace }}/Release-${{ matrix.target }}-DX11.zip
   build_editor:
     name: Build Editor Release
     needs: create_release
