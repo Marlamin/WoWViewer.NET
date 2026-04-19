@@ -272,6 +272,7 @@ namespace WoWRenderLib.DX11.Managers
                 {
                     var inputElements = new InputElementDesc[]
                     {
+                        // Buffer 0
                         new()
                         {
                             SemanticName = posName,
@@ -362,46 +363,48 @@ namespace WoWRenderLib.DX11.Managers
                             InputSlotClass = InputClassification.PerVertexData,
                             InstanceDataStepRate = 0
                         },
-                        //new()
-                        //{
-                        //    SemanticName = texCoordName,
-                        //    SemanticIndex = 4,
-                        //    Format = Format.FormatR32G32B32A32Float,
-                        //    InputSlot = 1,
-                        //    AlignedByteOffset = 0,
-                        //    InputSlotClass = InputClassification.PerInstanceData,
-                        //    InstanceDataStepRate = 1
-                        //},
-                        //new()
-                        //{
-                        //    SemanticName = texCoordName,
-                        //    SemanticIndex = 5,
-                        //    Format = Format.FormatR32G32B32A32Float,
-                        //    InputSlot = 1,
-                        //    AlignedByteOffset = uint.MaxValue,
-                        //    InputSlotClass = InputClassification.PerInstanceData,
-                        //    InstanceDataStepRate = 1
-                        //},
-                        //new()
-                        //{
-                        //    SemanticName = texCoordName,
-                        //    SemanticIndex = 6,
-                        //    Format = Format.FormatR32G32B32A32Float,
-                        //    InputSlot = 1,
-                        //    AlignedByteOffset = uint.MaxValue,
-                        //    InputSlotClass = InputClassification.PerInstanceData,
-                        //    InstanceDataStepRate = 1
-                        //},
-                        //new()
-                        //{
-                        //    SemanticName = texCoordName,
-                        //    SemanticIndex = 7,
-                        //    Format = Format.FormatR32G32B32A32Float,
-                        //    InputSlot = 1,
-                        //    AlignedByteOffset = uint.MaxValue,
-                        //    InputSlotClass = InputClassification.PerInstanceData,
-                        //    InstanceDataStepRate = 1
-                        //},
+
+                        // Buffer 1
+                        new()
+                        {
+                            SemanticName = texCoordName,
+                            SemanticIndex = 4,
+                            Format = Format.FormatR32G32B32A32Float,
+                            InputSlot = 1,
+                            AlignedByteOffset = 0,
+                            InputSlotClass = InputClassification.PerInstanceData,
+                            InstanceDataStepRate = 1
+                        },
+                        new()
+                        {
+                            SemanticName = texCoordName,
+                            SemanticIndex = 5,
+                            Format = Format.FormatR32G32B32A32Float,
+                            InputSlot = 1,
+                            AlignedByteOffset = uint.MaxValue,
+                            InputSlotClass = InputClassification.PerInstanceData,
+                            InstanceDataStepRate = 1
+                        },
+                        new()
+                        {
+                            SemanticName = texCoordName,
+                            SemanticIndex = 6,
+                            Format = Format.FormatR32G32B32A32Float,
+                            InputSlot = 1,
+                            AlignedByteOffset = uint.MaxValue,
+                            InputSlotClass = InputClassification.PerInstanceData,
+                            InstanceDataStepRate = 1
+                        },
+                        new()
+                        {
+                            SemanticName = texCoordName,
+                            SemanticIndex = 7,
+                            Format = Format.FormatR32G32B32A32Float,
+                            InputSlot = 1,
+                            AlignedByteOffset = uint.MaxValue,
+                            InputSlotClass = InputClassification.PerInstanceData,
+                            InstanceDataStepRate = 1
+                        },
                     };
 
                     SilkMarshal.ThrowHResult
@@ -425,45 +428,88 @@ namespace WoWRenderLib.DX11.Managers
                 {
                     var inputElements = new InputElementDesc[]
                     {
+                        // Buffer 0
                         new()
                         {
-                            SemanticName          = posName,
-                            SemanticIndex         = 0,
-                            Format                = Format.FormatR32G32B32Float,
-                            InputSlot             = 0,
-                            AlignedByteOffset     = 0,
-                            InputSlotClass        = InputClassification.PerVertexData,
-                            InstanceDataStepRate  = 0
+                            SemanticName = posName,
+                            SemanticIndex = 0,
+                            Format = Format.FormatR32G32B32Float,
+                            InputSlot = 0,
+                            AlignedByteOffset = 0,
+                            InputSlotClass = InputClassification.PerVertexData,
+                            InstanceDataStepRate = 0
                         },
                         new()
                         {
-                            SemanticName          = normalName,
-                            SemanticIndex         = 0,
-                            Format                = Format.FormatR32G32B32Float,
-                            InputSlot             = 0,
-                            AlignedByteOffset     = uint.MaxValue, // AUTO
-                            InputSlotClass        = InputClassification.PerVertexData,
-                            InstanceDataStepRate  = 0
+                            SemanticName = normalName,
+                            SemanticIndex = 0,
+                            Format = Format.FormatR32G32B32Float,
+                            InputSlot = 0,
+                            AlignedByteOffset = uint.MaxValue, // AUTO
+                            InputSlotClass = InputClassification.PerVertexData,
+                            InstanceDataStepRate = 0
                         },
                         new()
                         {
-                            SemanticName          = texCoordName,
-                            SemanticIndex         = 0, // TEXCOORD0
-                            Format                = Format.FormatR32G32Float,
-                            InputSlot             = 0,
-                            AlignedByteOffset     = uint.MaxValue, // AUTO
-                            InputSlotClass        = InputClassification.PerVertexData,
-                            InstanceDataStepRate  = 0
+                            SemanticName = texCoordName,
+                            SemanticIndex = 0, // TEXCOORD0
+                            Format = Format.FormatR32G32Float,
+                            InputSlot = 0,
+                            AlignedByteOffset = uint.MaxValue, // AUTO
+                            InputSlotClass = InputClassification.PerVertexData,
+                            InstanceDataStepRate = 0
                         },
                         new()
                         {
-                            SemanticName          = texCoordName,
-                            SemanticIndex         = 1, // TEXCOORD1
-                            Format                = Format.FormatR32G32Float,
-                            InputSlot             = 0,
-                            AlignedByteOffset     = uint.MaxValue, // AUTO
-                            InputSlotClass        = InputClassification.PerVertexData,
-                            InstanceDataStepRate  = 0
+                            SemanticName = texCoordName,
+                            SemanticIndex = 1, // TEXCOORD1
+                            Format = Format.FormatR32G32Float,
+                            InputSlot = 0,
+                            AlignedByteOffset = uint.MaxValue, // AUTO
+                            InputSlotClass = InputClassification.PerVertexData,
+                            InstanceDataStepRate = 0
+                        },
+
+                        // Buffer 1
+                        new()
+                        {
+                            SemanticName = texCoordName,
+                            SemanticIndex = 2,
+                            Format = Format.FormatR32G32B32A32Float,
+                            InputSlot = 1,
+                            AlignedByteOffset = 0,
+                            InputSlotClass = InputClassification.PerInstanceData,
+                            InstanceDataStepRate = 1
+                        },
+                        new()
+                        {
+                            SemanticName = texCoordName,
+                            SemanticIndex = 3,
+                            Format = Format.FormatR32G32B32A32Float,
+                            InputSlot = 1,
+                            AlignedByteOffset = uint.MaxValue,
+                            InputSlotClass = InputClassification.PerInstanceData,
+                            InstanceDataStepRate = 1
+                        },
+                        new()
+                        {
+                            SemanticName = texCoordName,
+                            SemanticIndex = 4,
+                            Format = Format.FormatR32G32B32A32Float,
+                            InputSlot = 1,
+                            AlignedByteOffset = uint.MaxValue,
+                            InputSlotClass = InputClassification.PerInstanceData,
+                            InstanceDataStepRate = 1
+                        },
+                        new()
+                        {
+                            SemanticName = texCoordName,
+                            SemanticIndex = 5,
+                            Format = Format.FormatR32G32B32A32Float,
+                            InputSlot = 1,
+                            AlignedByteOffset = uint.MaxValue,
+                            InputSlotClass = InputClassification.PerInstanceData,
+                            InstanceDataStepRate = 1
                         },
                     };
 

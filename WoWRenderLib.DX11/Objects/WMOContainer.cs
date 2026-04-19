@@ -39,7 +39,6 @@ namespace WoWRenderLib.DX11.Objects
             }
         }
 
-
         public bool[] EnabledGroups
         {
             get

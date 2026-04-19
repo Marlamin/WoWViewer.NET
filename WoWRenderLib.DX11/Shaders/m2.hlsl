@@ -23,10 +23,17 @@ SamplerState texSampler : register(s0);
 
 struct VSInput
 {
+    // Buffer 0
     float3 position : POSITION;
     float3 normal : NORMAL;
     float2 texCoord1 : TEXCOORD0;
     float2 texCoord2 : TEXCOORD1;
+    
+    // Buffer 1
+    float4 instanceRow0 : TEXCOORD2;
+    float4 instanceRow1 : TEXCOORD3;
+    float4 instanceRow2 : TEXCOORD4;
+    float4 instanceRow3 : TEXCOORD5;
 };
 
 struct VSOutput
@@ -43,7 +50,16 @@ VSOutput VS_Main(VSInput input)
 {
     VSOutput output;
 
-    float4 worldPos = mul(model_matrix, float4(input.position, 1.0));
+    float4x4 instanceMatrix = float4x4(
+        input.instanceRow0,
+        input.instanceRow1,
+        input.instanceRow2,
+        input.instanceRow3
+    );
+    
+    instanceMatrix = transpose(instanceMatrix);
+    
+    float4 worldPos = mul(instanceMatrix, float4(input.position, 1.0));
     output.position = mul(projection_matrix, mul(view_matrix, worldPos));
 
     float4x4 modelViewMatrix = mul(view_matrix, model_matrix);

@@ -27,6 +27,7 @@ SamplerState linearWrap : register(s0);
 
 struct VSIn
 {
+    // Buffer 0
     float3 position : POSITION;
     float3 normal : NORMAL;
     float2 texCoord : TEXCOORD0;
@@ -36,6 +37,12 @@ struct VSIn
     float4 color1 : COLOR0;
     float4 color2 : COLOR1;
     float4 color3 : COLOR2;
+    
+    // Buffer 1
+    float4 instanceRow0 : TEXCOORD4;
+    float4 instanceRow1 : TEXCOORD5;
+    float4 instanceRow2 : TEXCOORD6;
+    float4 instanceRow3 : TEXCOORD7;
 };
 
 struct VSOut
@@ -63,7 +70,17 @@ VSOut VS_Main(VSIn input)
 {
     VSOut o;
 
-    float4 worldPos = mul(model_matrix, float4(input.position, 1.0f));
+    float4x4 instanceMatrix = float4x4(
+        input.instanceRow0,
+        input.instanceRow1,
+        input.instanceRow2,
+        input.instanceRow3
+    );
+    
+    instanceMatrix = transpose(instanceMatrix);
+
+    float4 worldPos = mul(instanceMatrix, float4(input.position, 1.0f));
+    
     float4 viewPos = mul(view_matrix, worldPos);
     o.pos = mul(projection_matrix, viewPos);
 

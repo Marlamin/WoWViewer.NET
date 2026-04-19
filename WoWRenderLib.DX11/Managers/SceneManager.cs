@@ -44,11 +44,7 @@ namespace WoWRenderLib.DX11.Managers
 
         public Vector3 LightDirection { get; set; } = new Vector3(0.5f, 1f, 0.5f);
 
-        private ComPtr<ID3D11ShaderResourceView> defaultTexture;
-
-        // Instance rendering
-        //private uint instanceMatrixVBO;
-        //private const int MaxInstancesPerBatch = 1024;
+        private const int MaxInstancesPerBatch = 1024;
 
         private CompiledShader adtShaderProgram;
         private CompiledShader wmoShaderProgram;
@@ -70,7 +66,7 @@ namespace WoWRenderLib.DX11.Managers
 
         private readonly ComPtr<ID3D11Device> _device = device;
         private readonly ComPtr<IDXGISwapChain1> _swapChain = swapchain;
-        private ComPtr<ID3D11Buffer> perObjectConstantBuffer = default;
+        private ComPtr<ID3D11Buffer> adtPerObjectConstantBuffer = default;
         private ComPtr<ID3D11Buffer> layerDataConstantBuffer = default;
         private ComPtr<ID3D11Buffer> wmoPerObjectConstantBuffer = default;
         private ComPtr<ID3D11Buffer> m2PerObjectConstantBuffer = default;
@@ -83,6 +79,7 @@ namespace WoWRenderLib.DX11.Managers
         private ComPtr<ID3D11RasterizerState> rasterizerState = default;
         private ComPtr<ID3D11RasterizerState> wmoRasterizerState = default;
         private ComPtr<ID3D11ClassInstance> nullClassInstance = default;
+        private ComPtr<ID3D11ShaderResourceView> defaultTexture;
 
         private uint _renderWidth = 1920;
         private uint _renderHeight = 1080;
@@ -103,84 +100,11 @@ namespace WoWRenderLib.DX11.Managers
 
             // debugRenderer = new DebugRenderer(_gl, debugShaderProgram);
             defaultTexture = BLPLoader.CreatePlaceholderTexture(device);
-            //SetupInstanceBuffer();
 
             // Create PerObject constant buffer (matches cbuffer PerObject in adt.hlsl)
             unsafe
             {
-                var perObjectSize = (uint)Marshal.SizeOf<ADTPerObjectCB>();
-                var bufferDesc = new BufferDesc
-                {
-                    ByteWidth = perObjectSize,
-                    Usage = Usage.Default,
-                    BindFlags = (uint)BindFlag.ConstantBuffer
-                };
-
-                // Create buffer without initial data. We'll update it later via UpdateSubresource.
-                SilkMarshal.ThrowHResult(_device.CreateBuffer(in bufferDesc, null, ref perObjectConstantBuffer));
-
-                var layerDataSize = (uint)Marshal.SizeOf<LayerData>();
-                bufferDesc = new BufferDesc
-                {
-                    ByteWidth = layerDataSize,
-                    Usage = Usage.Default,
-                    BindFlags = (uint)BindFlag.ConstantBuffer
-                };
-
-                SilkMarshal.ThrowHResult(device.CreateBuffer(in bufferDesc, null, ref layerDataConstantBuffer));
-
-                bufferDesc = new BufferDesc
-                {
-                    ByteWidth = (uint)sizeof(WMOPerObjectCB),
-                    Usage = Usage.Default,
-                    BindFlags = (uint)BindFlag.ConstantBuffer
-                };
-
-                SilkMarshal.ThrowHResult(device.CreateBuffer(in bufferDesc, null, ref wmoPerObjectConstantBuffer));
-
-                bufferDesc = new BufferDesc
-                {
-                    ByteWidth = (uint)sizeof(M2PerObjectCB),
-                    Usage = Usage.Default,
-                    BindFlags = (uint)BindFlag.ConstantBuffer
-                };
-
-                SilkMarshal.ThrowHResult(device.CreateBuffer(in bufferDesc, null, ref m2PerObjectConstantBuffer));
-
-                //bufferDesc = new BufferDesc
-                //{
-                //    ByteWidth = (uint)(MaxInstancesPerBatch * sizeof(Matrix4x4)),
-                //    Usage = Usage.Default,
-                //    BindFlags = (uint)BindFlag.VertexBuffer
-                //};
-
-                //SilkMarshal.ThrowHResult(device.CreateBuffer(in bufferDesc, null, ref instanceMatrixBuffer));
-
-                var rastDesc = new RasterizerDesc
-                {
-                    FillMode = FillMode.Solid,
-                    CullMode = CullMode.Back, // TODO: Fix, then merge rasterizers
-                    FrontCounterClockwise = false,
-                    DepthClipEnable = true
-                };
-
-                SilkMarshal.ThrowHResult(device.CreateRasterizerState(in rastDesc, ref rasterizerState));
-                deviceContext.RSSetState(rasterizerState);
-
-                var wmoRastDesc = new RasterizerDesc
-                {
-                    FillMode = FillMode.Solid,
-                    CullMode = CullMode.Front,
-                    FrontCounterClockwise = false,
-                    DepthClipEnable = true
-                };
-                SilkMarshal.ThrowHResult(device.CreateRasterizerState(in wmoRastDesc, ref wmoRasterizerState));
-
-                ComPtr<ID3D11RasterizerState> rastState = default;
-                device.CreateRasterizerState(in rastDesc, ref rastState);
-                deviceContext.RSSetState(rastState);
-
-                // Create sampler states (moved from render loop)
+                // SAMPLERS
                 var samplerDesc = new SamplerDesc
                 {
                     Filter = Filter.MinMagMipLinear,
@@ -216,6 +140,80 @@ namespace WoWRenderLib.DX11.Managers
                 clampSamplerDesc.BorderColor[3] = 1.0f;
 
                 SilkMarshal.ThrowHResult(device.CreateSamplerState(in clampSamplerDesc, ref clampSampler));
+
+                // PER OBJECT CONSTANT BUFFERS
+                var bufferDesc = new BufferDesc
+                {
+                    ByteWidth = (uint)Marshal.SizeOf<ADTPerObjectCB>(),
+                    Usage = Usage.Default,
+                    BindFlags = (uint)BindFlag.ConstantBuffer
+                };
+
+                SilkMarshal.ThrowHResult(_device.CreateBuffer(in bufferDesc, null, ref adtPerObjectConstantBuffer));
+
+                bufferDesc = new BufferDesc
+                {
+                    ByteWidth = (uint)sizeof(WMOPerObjectCB),
+                    Usage = Usage.Default,
+                    BindFlags = (uint)BindFlag.ConstantBuffer
+                };
+
+                SilkMarshal.ThrowHResult(device.CreateBuffer(in bufferDesc, null, ref wmoPerObjectConstantBuffer));
+
+                bufferDesc = new BufferDesc
+                {
+                    ByteWidth = (uint)sizeof(M2PerObjectCB),
+                    Usage = Usage.Default,
+                    BindFlags = (uint)BindFlag.ConstantBuffer
+                };
+
+                SilkMarshal.ThrowHResult(device.CreateBuffer(in bufferDesc, null, ref m2PerObjectConstantBuffer));
+
+                // Instance buffer
+                bufferDesc = new BufferDesc
+                {
+                    ByteWidth = (uint)(MaxInstancesPerBatch * sizeof(Matrix4x4)),
+                    Usage = Usage.Dynamic,
+                    BindFlags = (uint)BindFlag.VertexBuffer,
+                    CPUAccessFlags = (uint)CpuAccessFlag.Write
+                };
+
+                SilkMarshal.ThrowHResult(device.CreateBuffer(in bufferDesc, null, ref instanceMatrixBuffer));
+
+                // ADT layer data
+                bufferDesc = new BufferDesc
+                {
+                    ByteWidth = (uint)Marshal.SizeOf<LayerData>(),
+                    Usage = Usage.Default,
+                    BindFlags = (uint)BindFlag.ConstantBuffer
+                };
+
+                SilkMarshal.ThrowHResult(device.CreateBuffer(in bufferDesc, null, ref layerDataConstantBuffer));
+
+                // Rasterizers, need to be merged once ADTs are fixed
+                var rastDesc = new RasterizerDesc
+                {
+                    FillMode = FillMode.Solid,
+                    CullMode = CullMode.Back, // TODO: Fix, then merge rasterizers
+                    FrontCounterClockwise = false,
+                    DepthClipEnable = true
+                };
+
+                SilkMarshal.ThrowHResult(device.CreateRasterizerState(in rastDesc, ref rasterizerState));
+                deviceContext.RSSetState(rasterizerState);
+
+                var wmoRastDesc = new RasterizerDesc
+                {
+                    FillMode = FillMode.Solid,
+                    CullMode = CullMode.Front,
+                    FrontCounterClockwise = false,
+                    DepthClipEnable = true
+                };
+                SilkMarshal.ThrowHResult(device.CreateRasterizerState(in wmoRastDesc, ref wmoRasterizerState));
+
+                ComPtr<ID3D11RasterizerState> rastState = default;
+                device.CreateRasterizerState(in rastDesc, ref rastState);
+                deviceContext.RSSetState(rastState);
 
                 CreateSizeDependentResources(1920, 1080);
             }
@@ -259,7 +257,6 @@ namespace WoWRenderLib.DX11.Managers
             _renderWidth = actualWidth;
             _renderHeight = actualHeight;
         }
-
 
         public unsafe void Resize(uint width, uint height)
         {
@@ -742,103 +739,53 @@ namespace WoWRenderLib.DX11.Managers
             uint m2VertexStride = (uint)Marshal.SizeOf<M2Vertex>();
             uint m2VertexOffset = 0;
 
-            foreach (var sceneObject in SceneObjects)
+            uint instanceStride = 64; //matrix4x4 but marshal complained so hardcoded it 
+            uint instanceOffset = 0;
+
+            // Set up WMO stuff, we do this before the loop since they're all shared
+            deviceContext.RSSetState(wmoRasterizerState);
+            deviceContext.IASetInputLayout(wmoShaderProgram.InputLayout);
+            deviceContext.VSSetShader(wmoShaderProgram.VertexShader, ref nullClassInstance, 0);
+            deviceContext.PSSetShader(wmoShaderProgram.PixelShader, ref nullClassInstance, 0);
+            deviceContext.PSSetSamplers(0, 1, ref textureSampler);
+            deviceContext.VSSetConstantBuffers(0, 1, ref wmoPerObjectConstantBuffer);
+            deviceContext.PSSetConstantBuffers(0, 1, ref wmoPerObjectConstantBuffer);
+
+            foreach (var (key, instances) in wmoInstances)
             {
-                if (sceneObject is M2Container m2Container)
+                if (!RenderWMO || instances.Count == 0)
+                    continue;
+
+                var firstInstance = instances[0];
+                if (!firstInstance.IsLoaded)
+                    continue;
+
+                var wmo = WMOCache.GetOrLoad(device, firstInstance.FileDataId, wmoShaderProgram, firstInstance.ParentFileDataId);
+                var enabledGroups = firstInstance.EnabledGroups;
+
+                for (int batchStart = 0; batchStart < instances.Count; batchStart += MaxInstancesPerBatch)
                 {
-                    if (!RenderM2)
-                        break;
+                    int batchCount = Math.Min(MaxInstancesPerBatch, instances.Count - batchStart);
 
-                    deviceContext.RSSetState(wmoRasterizerState); // can reuse this here for now, switch to generic one once adts are fixed
-
-                    var m2 = M2Cache.GetOrLoad(device, m2Container.FileDataId, m2ShaderProgram, m2Container.ParentFileDataId);
-
-                    deviceContext.IASetInputLayout(m2ShaderProgram.InputLayout);
-                    deviceContext.VSSetShader(m2ShaderProgram.VertexShader, ref nullClassInstance, 0);
-                    deviceContext.PSSetShader(m2ShaderProgram.PixelShader, ref nullClassInstance, 0);
-                    deviceContext.PSSetSamplers(0, 1, ref textureSampler);
-
-                    var vertexBuffer = m2.vertexBuffer;
-                    var indiceBuffer = m2.indiceBuffer;
-
-                    deviceContext.IASetVertexBuffers(0, 1, ref vertexBuffer, in m2VertexStride, in m2VertexOffset);
-                    deviceContext.IASetIndexBuffer(indiceBuffer, Format.FormatR16Uint, 0);
-
-                    var cb = new M2PerObjectCB
+                    // the normal approach to do updatesubresource doesn't work for dynamic buffers, so we have to do the below block instead
+                    unsafe
                     {
-                        projection_matrix = projectionMatrix,
-                        view_matrix = cameraMatrix,
-                        model_matrix = m2Container.GetModelMatrix(),
-                        vertexShader = 0,
-                        pixelShader = 0,
-                        texMatrix1 = Matrix4x4.Identity, // todo
-                        texMatrix2 = Matrix4x4.Identity, // todo
-                        hasTexMatrix1 = 0, // todo
-                        hasTexMatrix2 = 0, // todo
-                        lightDirection = LightDirection,
-                        alphaRef = 1.0f, // todo
-                        blendMode = 0,
-                        _pad = Vector3.Zero
-                    };
+                        MappedSubresource mapped = default;
+                        SilkMarshal.ThrowHResult(deviceContext.Map(instanceMatrixBuffer, 0, Map.WriteDiscard, 0, ref mapped));
 
-                    deviceContext.VSSetConstantBuffers(0, 1, ref m2PerObjectConstantBuffer);
-                    deviceContext.PSSetConstantBuffers(0, 1, ref m2PerObjectConstantBuffer);
+                        var dest = new Span<Matrix4x4>(mapped.PData, batchCount);
+                        for (int i = 0; i < batchCount; i++)
+                            dest[i] = instances[batchStart + i].GetModelMatrix();
 
-                    for (var j = 0; j < m2.submeshes.Length; j++)
-                    {
-                        var batch = m2.submeshes[j];
-
-                        cb.vertexShader = (int)batch.vertexShaderID;
-                        cb.pixelShader = (int)batch.pixelShaderID;
-                        cb.blendMode = batch.blendType;
-
-                        deviceContext.UpdateSubresource(m2PerObjectConstantBuffer, 0, ref Unsafe.NullRef<Box>(), ref cb, 0, 0);
-
-                        var srvs = batch.material.Select(id => id != 0 ? BLPCache.GetCurrent(id, defaultTexture) : defaultTexture).ToArray();
-                        if (srvs.Length > 0)
-                            deviceContext.PSSetShaderResources(0, (uint)srvs.Length, ref srvs[0]);
-
-                        deviceContext.DrawIndexed(batch.numFaces, batch.firstFace, 0);
+                        deviceContext.Unmap(instanceMatrixBuffer, 0);
                     }
-                }
-                else if (sceneObject is WMOContainer wmoContainer)
-                {
-                    if (!RenderWMO)
-                        break;
 
-                    if (!wmoContainer.IsLoaded)
-                        continue;
+                    deviceContext.IASetVertexBuffers(1, 1, ref instanceMatrixBuffer, in instanceStride, in instanceOffset);
 
-                    deviceContext.RSSetState(wmoRasterizerState);
-
-                    var wmo = WMOCache.GetOrLoad(device, wmoContainer.FileDataId, wmoShaderProgram, wmoContainer.ParentFileDataId);
-                    var enabledGroups = wmoContainer.EnabledGroups;
-
-                    deviceContext.IASetInputLayout(wmoShaderProgram.InputLayout);
-                    deviceContext.VSSetShader(wmoShaderProgram.VertexShader, ref nullClassInstance, 0);
-                    deviceContext.PSSetShader(wmoShaderProgram.PixelShader, ref nullClassInstance, 0);
-                    deviceContext.PSSetSamplers(0, 1, ref textureSampler);
-
-                    var cb = new WMOPerObjectCB
-                    {
-                        projection_matrix = projectionMatrix,
-                        view_matrix = cameraMatrix,
-                        model_matrix = wmoContainer.GetModelMatrix(),
-                        vertexShader = 0,
-                        pixelShader = 0,
-                        _pad0 = Vector2.Zero,
-                        lightDirection = LightDirection,
-                        alphaRef = 1.0f, // todo
-                    };
-
-                    deviceContext.VSSetConstantBuffers(0, 1, ref wmoPerObjectConstantBuffer);
-                    deviceContext.PSSetConstantBuffers(0, 1, ref wmoPerObjectConstantBuffer);
-
-                    for (var j = 0; j < wmo.wmoRenderBatch.Length; j++)
+                    for (int j = 0; j < wmo.wmoRenderBatch.Length; j++)
                     {
                         var batch = wmo.wmoRenderBatch[j];
-
-                        if (enabledGroups[batch.groupID] == false)
+                        if (!enabledGroups[batch.groupID])
                             continue;
 
                         var group = wmo.groupBatches[batch.groupID];
@@ -848,8 +795,17 @@ namespace WoWRenderLib.DX11.Managers
                         deviceContext.IASetVertexBuffers(0, 1, ref vertexBuffer, in wmoVertexStride, in wmoVertexOffset);
                         deviceContext.IASetIndexBuffer(indiceBuffer, Format.FormatR16Uint, 0);
 
-                        cb.vertexShader = (int)ShaderEnums.WMOShaders[(int)batch.shader].VertexShader;
-                        cb.pixelShader = (int)ShaderEnums.WMOShaders[(int)batch.shader].PixelShader;
+                        var cb = new WMOPerObjectCB
+                        {
+                            projection_matrix = projectionMatrix,
+                            view_matrix = cameraMatrix,
+                            model_matrix = Matrix4x4.Identity,
+                            vertexShader = (int)ShaderEnums.WMOShaders[(int)batch.shader].VertexShader,
+                            pixelShader = (int)ShaderEnums.WMOShaders[(int)batch.shader].PixelShader,
+                            _pad0 = Vector2.Zero,
+                            lightDirection = LightDirection,
+                            alphaRef = 1.0f,
+                        };
 
                         deviceContext.UpdateSubresource(wmoPerObjectConstantBuffer, 0, ref Unsafe.NullRef<Box>(), ref cb, 0, 0);
 
@@ -857,11 +813,86 @@ namespace WoWRenderLib.DX11.Managers
                         if (srvs.Length > 0)
                             deviceContext.PSSetShaderResources(0, (uint)srvs.Length, ref srvs[0]);
 
-                        deviceContext.DrawIndexed(batch.numFaces, batch.firstFace, 0);
+                        deviceContext.DrawIndexedInstanced(batch.numFaces, (uint)batchCount, batch.firstFace, 0, 0);
+                    }
+                }
+            }
+
+            // Set up M2 stuff (unchanged per M2 so we do it before we loop)
+            deviceContext.RSSetState(wmoRasterizerState);
+            deviceContext.IASetInputLayout(m2ShaderProgram.InputLayout);
+            deviceContext.VSSetShader(m2ShaderProgram.VertexShader, ref nullClassInstance, 0);
+            deviceContext.PSSetShader(m2ShaderProgram.PixelShader, ref nullClassInstance, 0);
+            deviceContext.PSSetSamplers(0, 1, ref textureSampler);
+            deviceContext.VSSetConstantBuffers(0, 1, ref m2PerObjectConstantBuffer);
+            deviceContext.PSSetConstantBuffers(0, 1, ref m2PerObjectConstantBuffer);
+
+            foreach (var (fileDataId, instances) in m2Instances)
+            {
+                if (!RenderM2 || instances.Count == 0)
+                    continue;
+
+                var m2 = M2Cache.GetOrLoad(device, fileDataId, m2ShaderProgram, instances[0].ParentFileDataId);
+
+                var vertexBuffer = m2.vertexBuffer;
+                var indiceBuffer = m2.indiceBuffer;
+
+                deviceContext.IASetVertexBuffers(0, 1, ref vertexBuffer, in m2VertexStride, in m2VertexOffset);
+                deviceContext.IASetIndexBuffer(indiceBuffer, Format.FormatR16Uint, 0);
+
+                for (int batchStart = 0; batchStart < instances.Count; batchStart += MaxInstancesPerBatch)
+                {
+                    int batchCount = Math.Min(MaxInstancesPerBatch, instances.Count - batchStart);
+
+                    unsafe
+                    {
+                        MappedSubresource mapped = default;
+                        SilkMarshal.ThrowHResult(deviceContext.Map(instanceMatrixBuffer, 0, Map.WriteDiscard, 0, ref mapped));
+
+                        var dest = new Span<Matrix4x4>(mapped.PData, batchCount);
+                        for (int i = 0; i < batchCount; i++)
+                            dest[i] = instances[batchStart + i].GetModelMatrix();
+
+                        deviceContext.Unmap(instanceMatrixBuffer, 0);
                     }
 
+                    deviceContext.IASetVertexBuffers(1, 1, ref instanceMatrixBuffer, in instanceStride, in instanceOffset);
+
+                    for (int j = 0; j < m2.submeshes.Length; j++)
+                    {
+                        var batch = m2.submeshes[j];
+
+                        var cb = new M2PerObjectCB
+                        {
+                            projection_matrix = projectionMatrix,
+                            view_matrix = cameraMatrix,
+                            model_matrix = Matrix4x4.Identity, // now comes from instance buffer
+                            vertexShader = (int)batch.vertexShaderID,
+                            pixelShader = (int)batch.pixelShaderID,
+                            texMatrix1 = Matrix4x4.Identity,
+                            texMatrix2 = Matrix4x4.Identity,
+                            hasTexMatrix1 = 0,
+                            hasTexMatrix2 = 0,
+                            lightDirection = LightDirection,
+                            alphaRef = 1.0f,
+                            blendMode = batch.blendType,
+                            _pad = Vector3.Zero
+                        };
+
+                        deviceContext.UpdateSubresource(m2PerObjectConstantBuffer, 0, ref Unsafe.NullRef<Box>(), ref cb, 0, 0);
+
+                        var srvs = batch.material.Select(id => id != 0 ? BLPCache.GetCurrent(id, defaultTexture) : defaultTexture).ToArray();
+                        if (srvs.Length > 0)
+                            deviceContext.PSSetShaderResources(0, (uint)srvs.Length, ref srvs[0]);
+
+                        deviceContext.DrawIndexedInstanced(batch.numFaces, (uint)batchCount, batch.firstFace, 0, 0);
+                    }
                 }
-                else if (sceneObject is ADTContainer adt)
+            }
+
+            foreach (var sceneObject in SceneObjects)
+            {
+                if (sceneObject is ADTContainer adt)
                 {
                     if (!RenderADT)
                         continue;
@@ -880,9 +911,9 @@ namespace WoWRenderLib.DX11.Managers
                         _pad0 = 0f
                     };
 
-                    deviceContext.UpdateSubresource(perObjectConstantBuffer, 0, ref Unsafe.NullRef<Box>(), ref cb, 0, 0);
-                    deviceContext.VSSetConstantBuffers(0, 1, ref perObjectConstantBuffer);
-                    deviceContext.PSSetConstantBuffers(0, 1, ref perObjectConstantBuffer);
+                    deviceContext.UpdateSubresource(adtPerObjectConstantBuffer, 0, ref Unsafe.NullRef<Box>(), ref cb, 0, 0);
+                    deviceContext.VSSetConstantBuffers(0, 1, ref adtPerObjectConstantBuffer);
+                    deviceContext.PSSetConstantBuffers(0, 1, ref adtPerObjectConstantBuffer);
 
                     deviceContext.IASetInputLayout(adtShaderProgram.InputLayout);
                     deviceContext.IASetVertexBuffers(0, 1, ref vertexBuffer, in adtVertexStride, in adtVertexOffset);
@@ -1016,31 +1047,6 @@ namespace WoWRenderLib.DX11.Managers
             return new Vector3(posY, posX, 0);
         }
 
-        //private unsafe void SetupInstanceBuffer()
-        //{
-        //    instanceMatrixVBO = _gl.GenBuffer();
-        //    _gl.BindBuffer(BufferTargetARB.ArrayBuffer, instanceMatrixVBO);
-        //    _gl.BufferData(BufferTargetARB.ArrayBuffer, (nuint)(MaxInstancesPerBatch * sizeof(float) * 16), null, BufferUsageARB.DynamicDraw);
-        //    _gl.BindBuffer(BufferTargetARB.ArrayBuffer, 0);
-        //}
-
-        //private unsafe void SetupInstanceAttributes(uint vao)
-        //{
-        //    _gl.BindVertexArray(vao);
-        //    _gl.BindBuffer(BufferTargetARB.ArrayBuffer, instanceMatrixVBO);
-
-        //    for (uint i = 0; i < 4; i++)
-        //    {
-        //        uint location = 10 + i;
-        //        _gl.EnableVertexAttribArray(location);
-        //        _gl.VertexAttribPointer(location, 4, VertexAttribPointerType.Float, false, sizeof(float) * 16, (void*)(sizeof(float) * 4 * i));
-        //        _gl.VertexAttribDivisor(location, 1);
-        //    }
-
-        //    _gl.BindBuffer(BufferTargetARB.ArrayBuffer, 0);
-        //    _gl.BindVertexArray(0);
-        //}
-
         //private unsafe uint MakeDefaultTexture()
         //{
         //    var defaultTexture = _gl.GenTexture();
@@ -1157,7 +1163,7 @@ namespace WoWRenderLib.DX11.Managers
                 renderTargetView.Dispose();
                 depthStencilView.Dispose();
                 depthTexture.Dispose();
-                perObjectConstantBuffer.Dispose();
+                adtPerObjectConstantBuffer.Dispose();
                 layerDataConstantBuffer.Dispose();
                 m2PerObjectConstantBuffer.Dispose();
                 wmoPerObjectConstantBuffer.Dispose();

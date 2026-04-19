@@ -7,6 +7,7 @@ using System.Diagnostics;
 using System.Numerics;
 using System.Runtime.InteropServices;
 using WoWFormatLib.FileProviders;
+using WoWRenderLib.DX11.Cache;
 using WoWRenderLib.DX11.Managers;
 using WoWRenderLib.DX11.Providers;
 
@@ -500,6 +501,14 @@ namespace WoWRenderLib.DX11
                 activeCamera.Position += moveSpeed * Vector3.UnitZ;
             if (input.KeysDown.Contains(Key.E))
                 activeCamera.Position -= moveSpeed * Vector3.UnitZ;
+
+            if (input.KeysDown.Contains(Key.I))
+            {
+                Console.WriteLine("ADT cache: " + ADTCache.GetCacheCount());
+                Console.WriteLine("WMO cache: " + WMOCache.GetCacheCount());
+                Console.WriteLine("M2 cache: " + M2Cache.GetCacheCount());
+                Console.WriteLine("BLP cache: " + BLPCache.GetCacheCount());
+            }
 
             if (input.KeysDown.Contains(Key.R))
             {
