@@ -37,10 +37,11 @@ namespace WoWRenderLib.DX11.Loaders
                 for (var ti = 0; ti < adt.diffuseTextureFileDataIDs.Length; ti++)
                 {
                     var diffuseTextureFDID = adt.diffuseTextureFileDataIDs[ti];
+                    BLPCache.GetOrLoad(device, diffuseTextureFDID, rootADTFileDataID);
 
                     var material = new ADTMaterial
                     {
-                        texture = BLPCache.GetOrLoad(device, diffuseTextureFDID, rootADTFileDataID)
+                        texture = (int)diffuseTextureFDID
                     };
 
                     usedBLPFileDataIDs.Add(diffuseTextureFDID);
@@ -55,14 +56,16 @@ namespace WoWRenderLib.DX11.Loaders
 
                             if (!FileProvider.FileExists(adt.heightTextureFileDataIDs[ti]))
                             {
-                                material.heightTexture = BLPCache.GetOrLoad(device, diffuseTextureFDID, rootADTFileDataID);
+                                material.heightTexture = (int)diffuseTextureFDID;
                                 usedBLPFileDataIDs.Add(diffuseTextureFDID);
+                                BLPCache.GetOrLoad(device, diffuseTextureFDID, rootADTFileDataID);
                             }
                             else
                             {
                                 var heightTextureFDID = adt.heightTextureFileDataIDs[ti];
-                                material.heightTexture = BLPCache.GetOrLoad(device, heightTextureFDID, rootADTFileDataID);
+                                material.heightTexture = (int)heightTextureFDID;
                                 usedBLPFileDataIDs.Add(heightTextureFDID);
+                                BLPCache.GetOrLoad(device, heightTextureFDID, rootADTFileDataID);
                             }
                         }
                         else
@@ -211,11 +214,11 @@ namespace WoWRenderLib.DX11.Loaders
                     if ((j + 1) % (9 + 8) == 0) j += 9;
                 }
 
-                var layerMaterials = new ComPtr<ID3D11ShaderResourceView>[8];
-                Array.Fill(layerMaterials, default);
+                var layerMaterials = new int[8];
+                Array.Fill(layerMaterials, -1);
 
-                var layerHeights = new ComPtr<ID3D11ShaderResourceView>[8];
-                Array.Fill(layerHeights, default);
+                var layerHeights = new int[8];
+                Array.Fill(layerHeights, -1);
 
                 var layerScales = new float[8];
                 Array.Fill(layerScales, 1.0f);
@@ -239,7 +242,7 @@ namespace WoWRenderLib.DX11.Loaders
                         alphaLayers.Add(li, chunk.alphaLayer[li].layer);
 
                     ADTMaterial curMat = materials[diffuseTextureID];
-                    layerMaterials[li] = BLPCache.GetOrLoad(device, diffuseTextureID, rootADTFileDataID);
+                    layerMaterials[li] = (int)diffuseTextureID;
                     usedBLPFileDataIDs.Add(diffuseTextureID);
 
                     layerHeights[li] = curMat.heightTexture;
@@ -296,10 +299,10 @@ namespace WoWRenderLib.DX11.Loaders
 
                 batch.heightScales = heightScales;
                 batch.heightOffsets = heightOffsets;
-                batch.materialID = layerMaterials;
+                batch.materialFDIDs = layerMaterials;
+                batch.heightMaterialFDIDs = layerHeights;
                 batch.alphaMaterialID = alphaLayerMats;
                 batch.scales = layerScales;
-                batch.heightMaterialIDs = layerHeights;
                 renderBatches.Add(batch);
 
                 chunkBounds[c] = new BoundingBox

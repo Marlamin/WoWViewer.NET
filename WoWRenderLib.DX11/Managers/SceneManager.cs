@@ -994,7 +994,7 @@ namespace WoWRenderLib.DX11.Managers
                     {
                         var batch = adt.Terrain.renderBatches[c];
 
-                        layerCB.layerCount = batch.materialID.Length;
+                        layerCB.layerCount = batch.materialFDIDs.Length;
                         layerCB.heightScales0 = new Vector4(batch.heightScales[0], batch.heightScales[1], batch.heightScales[2], batch.heightScales[3]);
                         layerCB.heightScales1 = new Vector4(batch.heightScales[4], batch.heightScales[5], batch.heightScales[6], batch.heightScales[7]);
                         layerCB.heightOffsets0 = new Vector4(batch.heightOffsets[0], batch.heightOffsets[1], batch.heightOffsets[2], batch.heightOffsets[3]);
@@ -1004,8 +1004,15 @@ namespace WoWRenderLib.DX11.Managers
 
                         deviceContext.UpdateSubresource(layerDataConstantBuffer, 0, ref Unsafe.NullRef<Box>(), ref layerCB, 0, 0);
 
-                        deviceContext.PSSetShaderResources(0, 8, ref batch.materialID[0]);
-                        deviceContext.PSSetShaderResources(8, 8, ref batch.heightMaterialIDs[0]);
+
+                        var materialIDsrvs = batch.materialFDIDs.Select(id => id != 0 ? BLPCache.GetCurrent((uint)id, defaultTexture) : defaultTexture).ToArray();
+                        if (materialIDsrvs.Length > 0)
+                            deviceContext.PSSetShaderResources(0, 8, ref materialIDsrvs[0]);
+
+                        var heightMaterialIDsrvs = batch.heightMaterialFDIDs.Select(id => id != 0 ? BLPCache.GetCurrent((uint)id, defaultTexture) : defaultTexture).ToArray();
+                        if (heightMaterialIDsrvs.Length > 0)
+                            deviceContext.PSSetShaderResources(8, 8, ref heightMaterialIDsrvs[0]);
+
                         deviceContext.PSSetShaderResources(16, 2, ref batch.alphaMaterialID[0]);
 
                         deviceContext.DrawIndexed(768, c * 768, 0);

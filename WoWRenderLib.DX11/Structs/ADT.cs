@@ -65,8 +65,8 @@ namespace WoWRenderLib.DX11.Structs
 
     public struct ADTMaterial
     {
-        public ComPtr<ID3D11ShaderResourceView> texture;
-        public ComPtr<ID3D11ShaderResourceView> heightTexture;
+        public int texture;
+        public int heightTexture;
         public float scale;
         public float heightScale;
         public float heightOffset;
@@ -74,10 +74,10 @@ namespace WoWRenderLib.DX11.Structs
 
     public struct ADTRenderBatch
     {
-        public ComPtr<ID3D11ShaderResourceView>[] materialID;
+        public int[] materialFDIDs;
+        public int[] heightMaterialFDIDs;
         public ComPtr<ID3D11ShaderResourceView>[] alphaMaterialID;
         public float[] scales;
-        public ComPtr<ID3D11ShaderResourceView>[] heightMaterialIDs;
         public float[] heightScales;
         public float[] heightOffsets;
     }

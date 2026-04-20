@@ -200,7 +200,7 @@ namespace WoWViewer.NET.DX11
         {
             hasFocus = focused;
 
-            //  wowViewerEngine.SetHasFocus(focused);
+            wowViewerEngine.SetHasFocus(focused);
         }
 
     }
