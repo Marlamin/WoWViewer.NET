@@ -18,6 +18,8 @@ namespace WoWRenderLib.DX11.Objects
         public Quaternion LocalRotation { get; set; }
         public float LocalScale { get; set; } = 1.0f;
 
+        private BoundingSphere? CachedBoundingSphere = null;
+
         public M2Container(ComPtr<ID3D11Device> device, uint fileDataID, CompiledShader shaderProgram, uint parentFileDataId) : base(device, fileDataID, shaderProgram, parentFileDataId)
         {
             m2 = M2Cache.GetOrLoad(device, fileDataID, shaderProgram, parentFileDataId);
@@ -27,19 +29,29 @@ namespace WoWRenderLib.DX11.Objects
 
         public override BoundingSphere? GetBoundingSphere()
         {
-            var transformedCenter = Vector3.Transform(Vector3.Zero, GetModelMatrix());
-            return new BoundingSphere(transformedCenter, m2.boundingRadius * Scale);
+            if(CachedBoundingSphere.HasValue)
+                return CachedBoundingSphere.Value;
+
+            var localBox = GetLocalBoundingBox();
+            var transformedCenter = Vector3.Transform((localBox.Min + localBox.Max) / 2f, GetModelMatrix());
+
+            float realScale = Scale;
+            
+            if(ParentWMO != null)
+                realScale = LocalScale * ParentWMO.Scale;
+
+            CachedBoundingSphere = new BoundingSphere(transformedCenter, m2.boundingRadius * realScale);
+            return CachedBoundingSphere.Value;
         }
 
         public override BoundingBox? GetBoundingBox()
         {
-            var box = new BoundingBox(m2.boundingBox.Min, m2.boundingBox.Max);
-            return BoundingBox.Transform(box, GetModelMatrix());
+            return BoundingBox.Transform(GetLocalBoundingBox(), GetModelMatrix());
         }
 
         public BoundingBox GetLocalBoundingBox()
         {
-            return new BoundingBox(m2.boundingBox.Min, m2.boundingBox.Max);
+            return m2.boundingBox;
         }
     }
 }

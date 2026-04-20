@@ -1021,9 +1021,8 @@ namespace WoWRenderLib.DX11.Managers
             }
 
             // Bounding box rendering
-            if (ShowBoundingBoxes || SelectedObject != null)
+            if (ShowBoundingBoxes || ShowBoundingSpheres || SelectedObject != null)
             {
-                // enable wireframe resterizer 
                 deviceContext.RSSetState(wireframeRasterizerState);
                 deviceContext.IASetPrimitiveTopology(D3DPrimitiveTopology.D3DPrimitiveTopologyLinelist);
                 deviceContext.IASetInputLayout(bboxShaderProgram.InputLayout);
@@ -1036,40 +1035,45 @@ namespace WoWRenderLib.DX11.Managers
                     foreach (var sceneObject in SceneObjects)
                     {
                         if (sceneObject is ADTContainer) continue;
-                        if (!ShowBoundingBoxes && !sceneObject.IsSelected) continue;
+                        if (!ShowBoundingBoxes && !ShowBoundingSpheres && !sceneObject.IsSelected) continue;
 
                         var color = sceneObject.IsSelected ? new Vector4(0, 1, 0, 1) : new Vector4(1, 1, 0, 1);
-                        var box = sceneObject.GetBoundingBox();
 
-                        if (box.HasValue && float.IsFinite(box.Value.Min.X) && float.IsFinite(box.Value.Max.X))
+                        if (ShowBoundingBoxes || sceneObject.IsSelected)
                         {
-                            BoundingBox localBox;
-                            Matrix4x4 modelMatrix;
+                            var box = sceneObject.GetBoundingBox();
+                            if (box.HasValue && float.IsFinite(box.Value.Min.X) && float.IsFinite(box.Value.Max.X))
+                            {
+                                BoundingBox localBox;
+                                Matrix4x4 modelMatrix;
 
-                            if (sceneObject is WMOContainer wmo)
-                            {
-                                localBox = wmo.GetLocalBoundingBox();
-                                modelMatrix = wmo.GetModelMatrix();
-                            }
-                            else if (sceneObject is M2Container m2)
-                            {
-                                localBox = m2.GetLocalBoundingBox();
-                                modelMatrix = m2.GetModelMatrix();
-                            }
-                            else
-                            {
-                                throw new NotImplementedException("Tried to draw bounding box for non m2/wmo");
-                            }
+                                if (sceneObject is WMOContainer wmo)
+                                {
+                                    localBox = wmo.GetLocalBoundingBox();
+                                    modelMatrix = wmo.GetModelMatrix();
+                                }
+                                else if (sceneObject is M2Container m2)
+                                {
+                                    localBox = m2.GetLocalBoundingBox();
+                                    modelMatrix = m2.GetModelMatrix();
+                                }
+                                else continue;
 
-                            DrawBoundingBox(localBox, modelMatrix, color, projectionMatrix, cameraMatrix);
+                                DrawBoundingBox(localBox, modelMatrix, color, projectionMatrix, cameraMatrix);
+                            }
+                        }
+
+                        if (ShowBoundingSpheres || sceneObject.IsSelected)
+                        {
+                            var sphere = sceneObject.GetBoundingSphere();
+                            if (sphere.HasValue)
+                                DrawBoundingSphere(sphere.Value, new Vector4(0, 0.5f, 1, 1), projectionMatrix, cameraMatrix);
                         }
                     }
                 }
 
-                // restore normal rasterizer
                 deviceContext.RSSetState(rasterizerState);
                 deviceContext.IASetPrimitiveTopology(D3DPrimitiveTopology.D3DPrimitiveTopologyTrianglelist);
-
                 ComPtr<ID3D11DepthStencilState> nullDSS = default;
                 deviceContext.OMSetDepthStencilState(nullDSS, 0);
             }
@@ -1078,6 +1082,87 @@ namespace WoWRenderLib.DX11.Managers
 
             gizmoWasUsing = false;
             gizmoWasOver = false;
+        }
+
+        private unsafe void DrawBoundingSphere(BoundingSphere sphere, Vector4 color, Matrix4x4 projection, Matrix4x4 view)
+        {
+            const int segments = 32;
+            var verts = new List<Vector3>();
+
+            for (int pass = 0; pass < 3; pass++)
+            {
+                for (int s = 0; s < segments; s++)
+                {
+                    float a0 = (MathF.PI * 2f / segments) * s;
+                    float a1 = (MathF.PI * 2f / segments) * (s + 1);
+
+                    Vector3 p0, p1;
+                    switch (pass)
+                    {
+                        case 0: // XY
+                            p0 = new Vector3(MathF.Cos(a0), MathF.Sin(a0), 0);
+                            p1 = new Vector3(MathF.Cos(a1), MathF.Sin(a1), 0);
+                            break;
+                        case 1: // XZ
+                            p0 = new Vector3(MathF.Cos(a0), 0, MathF.Sin(a0));
+                            p1 = new Vector3(MathF.Cos(a1), 0, MathF.Sin(a1));
+                            break;
+                        default: // YZ
+                            p0 = new Vector3(0, MathF.Cos(a0), MathF.Sin(a0));
+                            p1 = new Vector3(0, MathF.Cos(a1), MathF.Sin(a1));
+                            break;
+                    }
+
+                    verts.Add(sphere.Center + p0 * sphere.Radius);
+                    verts.Add(sphere.Center + p1 * sphere.Radius);
+                }
+            }
+
+            int vertCount = verts.Count; // 3 * segments * 2 = 192 for segments=32
+            var sphereVerts = verts.ToArray();
+
+            var vbDesc = new BufferDesc
+            {
+                ByteWidth = (uint)(vertCount * sizeof(Vector3)),
+                Usage = Usage.Dynamic,
+                BindFlags = (uint)BindFlag.VertexBuffer,
+                CPUAccessFlags = (uint)CpuAccessFlag.Write
+            };
+
+            ComPtr<ID3D11Buffer> sphereVB = default;
+            SilkMarshal.ThrowHResult(device.CreateBuffer(in vbDesc, null, ref sphereVB));
+
+            MappedSubresource mappedVB = default;
+            SilkMarshal.ThrowHResult(deviceContext.Map(sphereVB, 0, Map.WriteDiscard, 0, ref mappedVB));
+            var dest = new Span<Vector3>(mappedVB.PData, vertCount);
+            sphereVerts.CopyTo(dest);
+            deviceContext.Unmap(sphereVB, 0);
+
+            var cb = new BBoxCB
+            {
+                projection_matrix = projection,
+                view_matrix = view,
+                model_matrix = Matrix4x4.Identity,
+                color = color
+            };
+
+            MappedSubresource mappedCB = default;
+            SilkMarshal.ThrowHResult(deviceContext.Map(bboxConstantBuffer, 0, Map.WriteDiscard, 0, ref mappedCB));
+            *(BBoxCB*)mappedCB.PData = cb;
+            deviceContext.Unmap(bboxConstantBuffer, 0);
+
+            uint stride = (uint)sizeof(Vector3);
+            uint offset = 0;
+            deviceContext.IASetVertexBuffers(0, 1, ref sphereVB, in stride, in offset);
+            deviceContext.VSSetConstantBuffers(0, 1, ref bboxConstantBuffer);
+            deviceContext.PSSetConstantBuffers(0, 1, ref bboxConstantBuffer);
+
+            ComPtr<ID3D11Buffer> nullBuffer = default;
+            uint nullStride = 0, nullOffset = 0;
+            deviceContext.IASetVertexBuffers(1, 1, ref nullBuffer, in nullStride, in nullOffset);
+
+            deviceContext.Draw((uint)vertCount, 0);
+            sphereVB.Dispose();
         }
 
         private unsafe void DrawBoundingBox(BoundingBox localBox, Matrix4x4 modelMatrix, Vector4 color, Matrix4x4 projection, Matrix4x4 view)
