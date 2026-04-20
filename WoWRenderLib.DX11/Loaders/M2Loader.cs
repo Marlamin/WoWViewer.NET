@@ -35,14 +35,27 @@ namespace WoWRenderLib.DX11.Loaders
             Vector3 bbMin, bbMax;
             float bbRadius;
 
-            if (model.boundingbox == null || model.boundingbox.Length < 2 || (model.boundingbox[0].X == 0 && model.boundingbox[0].Y == 0 && model.boundingbox[0].Z == 0 && model.boundingbox[1].X == 0 && model.boundingbox[1].Y == 0 && model.boundingbox[1].Z == 0))
+            if (
+                model.boundingbox == null || 
+                model.boundingbox.Length < 2 || 
+                (model.boundingbox[0] == Vector3.Zero && model.boundingbox[1] == Vector3.Zero) || 
+                (model.boundingbox[1] == new Vector3(-10000000, -10000000, -10000000) && model.boundingbox[0] == new Vector3(10000000, 10000000, 10000000))
+                )
             {
+                var min = new Vector3(float.MaxValue);
+                var max = new Vector3(float.MinValue);
+
                 if (model.vertices != null && model.vertices.Length > 0)
                 {
-                    // TODO: figure out how to make our own bounding box
-                    bbMin = Vector3.Zero;
-                    bbMax = Vector3.Zero;
-                    bbRadius = 0;
+                    foreach (var vertex in model.vertices)
+                    {
+                        min = Vector3.Min(min, vertex.position);
+                        max = Vector3.Max(max, vertex.position);
+                    }
+
+                    bbMin = min;
+                    bbMax = max;
+                    bbRadius = Vector3.Distance((bbMin + bbMax) / 2f, bbMax);
                 }
                 else
                 {
