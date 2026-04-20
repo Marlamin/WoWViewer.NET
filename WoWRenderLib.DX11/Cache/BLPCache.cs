@@ -169,22 +169,15 @@ namespace WoWRenderLib.DX11.Cache
             return fallback;
         }
 
-        public static void Upload()
+        public static void Upload(Stopwatch queueTimer)
         {
-            if (cachedDevice == null)
+            if (!cachedDevice.HasValue)
                 return;
 
-            // This may need some tweaking....
-            const int maxUploadsPerFrame = 10;
-            int uploaded = 0;
-
-            while (uploaded < maxUploadsPerFrame)
+            while (queueTimer.ElapsedMilliseconds < 5)
             {
                 if (!uploadQueue.TryDequeue(out var decoded))
                     break;
-
-                if (!cachedDevice.HasValue)
-                    continue;
 
                 try
                 {
@@ -278,9 +271,8 @@ namespace WoWRenderLib.DX11.Cache
                 }
 
                 inFlight.Remove(decoded.FileDataId);
-
-                uploaded++;
             }
+
         }
 
         public static void StopWorker()
@@ -319,6 +311,23 @@ namespace WoWRenderLib.DX11.Cache
         public static int GetCacheCount()
         {
             return Cache.Count;
+        }
+
+        public static void CheckUsers()
+        {
+            var blpsToRemove = new List<uint>();
+            foreach (var cachedBLP in Cache.Keys)
+                if (!Users.ContainsKey(cachedBLP))
+                    blpsToRemove.Add(cachedBLP);
+
+            foreach (var blpId in blpsToRemove)
+            {
+                if (Cache.TryGetValue(blpId, out var blp))
+                {
+                    Cache.TryRemove(blpId, out _);
+                    blp.Dispose();
+                }
+            }   
         }
 
         public static void ReleaseAll()

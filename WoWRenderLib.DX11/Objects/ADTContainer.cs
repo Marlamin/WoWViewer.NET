@@ -11,7 +11,7 @@ namespace WoWRenderLib.DX11.Objects
         public Terrain Terrain { get; }
         public MapTile mapTile;
 
-        public ADTContainer(ComPtr<ID3D11Device> device, Terrain terrain, MapTile mapTile, CompiledShader shaderProgram) : base(device, mapTile.wdtFileDataID, shaderProgram, mapTile.wdtFileDataID)
+        public ADTContainer(ComPtr<ID3D11Device> device, Terrain terrain, MapTile mapTile) : base(device, mapTile.wdtFileDataID, mapTile.wdtFileDataID)
         {
             Terrain = terrain;
             this.mapTile = mapTile;

@@ -3,7 +3,6 @@ using Silk.NET.Direct3D11;
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using WoWRenderLib.DX11.Loaders;
-using WoWRenderLib.DX11.Managers;
 using WoWRenderLib.DX11.Structs;
 
 namespace WoWRenderLib.DX11.Cache
@@ -24,7 +23,7 @@ namespace WoWRenderLib.DX11.Cache
         private static CancellationTokenSource? workerCancellation;
         private static Task? workerTask;
 
-        public static WorldModel GetOrLoad(ComPtr<ID3D11Device> device, uint fileDataId, CompiledShader shaderProgram, uint parent, bool keepTrack = true)
+        public static WorldModel GetOrLoad(ComPtr<ID3D11Device> device, uint fileDataId, uint parent, bool keepTrack = true)
         {
             cachedDevice ??= device;
 
@@ -46,7 +45,7 @@ namespace WoWRenderLib.DX11.Cache
             try
             {
                 var preppedWMO = WMOLoader.ParseWMO(112521);
-                placeholderWMO = WMOLoader.LoadWMO(preppedWMO, device, shaderProgram); // missingwmo.wmo
+                placeholderWMO = WMOLoader.LoadWMO(preppedWMO, device); // missingwmo.wmo
             }
             catch (Exception e)
             {
@@ -78,10 +77,9 @@ namespace WoWRenderLib.DX11.Cache
         {
             while (!cancellationToken.IsCancellationRequested)
             {
-                uint fileDataId = 0;
                 bool hasWork = false;
 
-                if (parseQueue.TryDequeue(out fileDataId))
+                if (parseQueue.TryDequeue(out var fileDataId))
                     hasWork = true;
 
                 if (!hasWork)
@@ -105,33 +103,30 @@ namespace WoWRenderLib.DX11.Cache
             }
         }
 
-        public static void Upload(CompiledShader shaderProgram)
+        public static void Upload(Stopwatch queueTimer)
         {
             if (cachedDevice == null)
                 return;
 
-            const int maxUploadsPerFrame = 2;
-            int uploaded = 0;
-
-            while (uploaded < maxUploadsPerFrame)
+            while (queueTimer.ElapsedMilliseconds < 5)
             {
+                if (!uploadQueue.TryDequeue(out var item))
+                    return;
+
                 uint originalFileDataId;
                 PreppedWMO preppedWMO;
-
-                if (!uploadQueue.TryDequeue(out var item))
-                    break;
 
                 (originalFileDataId, preppedWMO) = item;
 
                 if (!Cache.TryGetValue(originalFileDataId, out var oldWMO))
                 {
                     inFlight.Remove(originalFileDataId);
-                    continue;
+                    return;
                 }
 
                 try
                 {
-                    var newWMO = WMOLoader.LoadWMO(preppedWMO, cachedDevice.Value, shaderProgram);
+                    var newWMO = WMOLoader.LoadWMO(preppedWMO, cachedDevice.Value);
                     Cache[originalFileDataId] = newWMO;
 
                     if (oldWMO.groupBatches != null && oldWMO.groupBatches.Length > 0)
@@ -143,8 +138,6 @@ namespace WoWRenderLib.DX11.Cache
                 }
 
                 inFlight.Remove(originalFileDataId);
-
-                uploaded++;
             }
         }
 
@@ -179,6 +172,23 @@ namespace WoWRenderLib.DX11.Cache
                 else
                 {
                     Users[fileDataId] = users;
+                }
+            }
+        }
+
+        public static void CheckUsers()
+        {
+            var wmosToRemove = new List<uint>();
+            foreach (var cachedWMO in Cache.Keys)
+                if (!Users.ContainsKey(cachedWMO))
+                    wmosToRemove.Add(cachedWMO);
+
+            foreach (var wmoId in wmosToRemove)
+            {
+                if (Cache.TryGetValue(wmoId, out var wmo))
+                {
+                    Cache.Remove(wmoId);
+                    WMOLoader.UnloadWMO(wmo);
                 }
             }
         }

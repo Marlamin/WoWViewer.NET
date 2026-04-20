@@ -1,7 +1,6 @@
 ﻿using Silk.NET.Core.Native;
 using Silk.NET.Direct3D11;
 using System.Numerics;
-using WoWRenderLib.DX11.Managers;
 using WoWRenderLib.DX11.Raycasting;
 using WoWRenderLib.DX11.Structs;
 
@@ -17,10 +16,13 @@ namespace WoWRenderLib.DX11.Objects
 
         public Matrix4x4? ModelMatrix { get; set; }
 
+        public ComPtr<ID3D11Device> _device;
+
         public bool IsSelected { get; set; } = false;
 
-        public Container3D(ComPtr<ID3D11Device> device, uint fileDataId, CompiledShader shaderProgram, uint parentFileDataId)
+        public Container3D(ComPtr<ID3D11Device> device, uint fileDataId, uint parentFileDataId)
         {
+            _device = device;
             FileDataId = fileDataId;
             ParentFileDataId = parentFileDataId;
         }

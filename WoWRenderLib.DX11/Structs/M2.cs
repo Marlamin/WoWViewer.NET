@@ -25,12 +25,22 @@ namespace WoWRenderLib.DX11.Structs
         public Vector3 _pad;
     }
 
+    public struct ParsedM2
+    {
+        public uint fileDataID;
+        public byte[] vertexBytes;
+        public byte[] indiceBytes;
+        public BoundingBox boundingBox;
+        public float boundingRadius;
+        public Submesh[] submeshes;
+        public M2Material[] mats;
+    }
+
     public struct DoodadBatch
     {
         public uint fileDataID;
         public ComPtr<ID3D11Buffer> vertexBuffer;
         public ComPtr<ID3D11Buffer> indiceBuffer;
-        public uint[] indices;
         public BoundingBox boundingBox;
         public float boundingRadius;
         public Submesh[] submeshes;

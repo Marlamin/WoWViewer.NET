@@ -5,14 +5,13 @@ using WoWFormatLib.FileProviders;
 using WoWFormatLib.FileReaders;
 using WoWFormatLib.Structs.ADT;
 using WoWRenderLib.DX11.Cache;
-using WoWRenderLib.DX11.Managers;
 using WoWRenderLib.DX11.Structs;
 
 namespace WoWRenderLib.DX11.Loaders
 {
     class ADTLoader
     {
-        public static unsafe Terrain LoadADT(ComPtr<ID3D11Device> device, Structs.MapTile mapTile, CompiledShader shaderProgram)
+        public static unsafe Terrain LoadADT(ComPtr<ID3D11Device> device, Structs.MapTile mapTile)
         {
             ADT adt = new();
             Terrain result = new();
@@ -46,7 +45,7 @@ namespace WoWRenderLib.DX11.Loaders
 
                     usedBLPFileDataIDs.Add(diffuseTextureFDID);
 
-                    if (adt.texParams != null && adt.texParams.Length >= ti)
+                    if (adt.texParams != null && adt.texParams.Length > ti)
                     {
                         material.scale = (float)Math.Pow(2, (adt.texParams[ti].flags & 0xF0) >> 4);
                         if (adt.texParams[ti].height != 0.0 || adt.texParams[ti].offset != 1.0)
@@ -91,7 +90,7 @@ namespace WoWRenderLib.DX11.Loaders
             var initialChunkY = adt.chunks[0].header.position.Y;
             var initialChunkX = adt.chunks[0].header.position.X;
 
-            var renderBatches = new List<ADTRenderBatch>(256);
+            var renderBatches = new ADTRenderBatch[256];
 
             var vertices = new ADTVertex[256 * 145];
             var indices = new int[256 * 768];
@@ -99,7 +98,8 @@ namespace WoWRenderLib.DX11.Loaders
             var indicesOffset = 0;
 
             var chunkBounds = new BoundingBox[256];
-
+            var holesHighRes = new byte[8];
+            var defaultVertexColor = new Vector4(0.5f, 0.5f, 0.5f, 1.0f);
             for (int c = 0; c < adt.chunks.Length; c++)
             {
                 var batch = new ADTRenderBatch();
@@ -109,6 +109,7 @@ namespace WoWRenderLib.DX11.Loaders
                 var chunkMinBounds = new Vector3(float.MaxValue, float.MaxValue, float.MaxValue);
                 var chunkMaxBounds = new Vector3(float.MinValue, float.MinValue, float.MinValue);
 
+                bool hasMCCV = chunk.header.flags.HasFlag(MCNKFlags.mcnk_has_mccv);
                 for (int i = 0, idx = 0; i < 17; i++)
                 {
                     var isInnerVertice = (i % 2) != 0;
@@ -118,7 +119,7 @@ namespace WoWRenderLib.DX11.Loaders
                         var v = new ADTVertex
                         {
                             Normal = new Vector3(chunk.normals.normal_0[idx], chunk.normals.normal_1[idx], chunk.normals.normal_2[idx]),
-                            Color = chunk.header.flags.HasFlag(MCNKFlags.mcnk_has_mccv) ? new Vector4(chunk.vertexShading.blue[idx] / 255.0f, chunk.vertexShading.green[idx] / 255.0f, chunk.vertexShading.red[idx] / 255.0f, chunk.vertexShading.alpha[idx] / 255.0f) : new Vector4(0.5f, 0.5f, 0.5f, 1.0f),
+                            Color = hasMCCV ? new Vector4(chunk.vertexShading.blue[idx] / 255.0f, chunk.vertexShading.green[idx] / 255.0f, chunk.vertexShading.red[idx] / 255.0f, chunk.vertexShading.alpha[idx] / 255.0f) : defaultVertexColor,
                             TexCoord = new Vector2((j + (isInnerVertice ? 0.5f : 0f)) / 8f, (halfHeight) / 8f),
                             Position = new Vector3(chunk.header.position.X - (halfHeight * UnitSize), chunk.header.position.Y - (j * UnitSize), chunk.vertices.vertices[idx++] + chunk.header.position.Z)
                         };
@@ -133,9 +134,9 @@ namespace WoWRenderLib.DX11.Loaders
                     }
                 }
 
-                result.startPos = vertices[0].Position;
+                if (c == 0)
+                    result.startPos = vertices[0].Position;
 
-                var holesHighRes = new byte[8];
                 holesHighRes[0] = chunk.header.holesHighRes_0;
                 holesHighRes[1] = chunk.header.holesHighRes_1;
                 holesHighRes[2] = chunk.header.holesHighRes_2;
@@ -145,6 +146,8 @@ namespace WoWRenderLib.DX11.Loaders
                 holesHighRes[6] = chunk.header.holesHighRes_6;
                 holesHighRes[7] = chunk.header.holesHighRes_7;
 
+                bool isHighResHoles = chunk.header.flags.HasFlag(MCNKFlags.mcnk_high_res_holes);
+
                 int off = c * 145;
                 for (int j = 9, xx = 0, yy = 0; j < 145; j++, xx++)
                 {
@@ -152,12 +155,10 @@ namespace WoWRenderLib.DX11.Loaders
                     var isHole = true;
 
                     // Check if chunk is using low-res holes
-                    if (!chunk.header.flags.HasFlag(MCNKFlags.mcnk_high_res_holes))
+                    if (!isHighResHoles)
                     {
                         // Calculate current hole number
-                        var currentHole = (int)Math.Pow(2,
-                                Math.Floor(xx / 2f) * 1f +
-                                Math.Floor(yy / 2f) * 4f);
+                        var currentHole = 1 << ((xx / 2) + (yy / 2) * 4);
 
                         // Check if current hole number should be a hole
                         if ((chunk.header.holesLowRes & currentHole) == 0)
@@ -231,11 +232,11 @@ namespace WoWRenderLib.DX11.Loaders
 
                 var alphaLayers = new Dictionary<int, byte[]>(chunk.layers?.Length ?? 4);
 
+                if (adt.diffuseTextureFileDataIDs == null)
+                    continue;
+
                 for (byte li = 0; li < chunk.layers!.Length; li++)
                 {
-                    if (adt.diffuseTextureFileDataIDs == null)
-                        continue;
-
                     var diffuseTextureID = adt.diffuseTextureFileDataIDs[chunk.layers[li].textureId];
 
                     if (chunk.alphaLayer != null)
@@ -256,41 +257,24 @@ namespace WoWRenderLib.DX11.Loaders
 
                 for (int li = 0; li < 2; li++)
                 {
-                    var hasAlphas = false;
+                    int baseLayer = li * 4;
+                    alphaLayers.TryGetValue(baseLayer, out var l0);
+                    alphaLayers.TryGetValue(baseLayer + 1, out var l1);
+                    alphaLayers.TryGetValue(baseLayer + 2, out var l2);
+                    alphaLayers.TryGetValue(baseLayer + 3, out var l3);
 
-                    if (!alphaLayers.TryGetValue(0 + (li * 4), out var alphaLayer0))
-                        alphaLayer0 = new byte[4096];
-                    else
-                        hasAlphas = true;
-
-                    if (!alphaLayers.TryGetValue(1 + (li * 4), out var alphaLayer1))
-                        alphaLayer1 = new byte[4096];
-                    else
-                        hasAlphas = true;
-
-                    if (!alphaLayers.TryGetValue(2 + (li * 4), out var alphaLayer2))
-                        alphaLayer2 = new byte[4096];
-                    else
-                        hasAlphas = true;
-
-                    if (!alphaLayers.TryGetValue(3 + (li * 4), out var alphaLayer3))
-                        alphaLayer3 = new byte[4096];
-                    else
-                        hasAlphas = true;
-
-                    if (!hasAlphas)
-                        continue;
+                    if (l0 == null && l1 == null && l2 == null && l3 == null) continue;
 
                     var alphaData = new byte[64 * 64 * 4];
-                    for (int x = 0; x < 64; x++)
+                    for (int y = 0; y < 64; y++)
                     {
-                        for (int y = 0; y < 64; y++)
+                        for (int x = 0; x < 64; x++)
                         {
                             var idx = (y * 64 + x) * 4;
-                            alphaData[idx] = alphaLayer0[y * 64 + x];
-                            alphaData[idx + 1] = alphaLayer1[y * 64 + x];
-                            alphaData[idx + 2] = alphaLayer2[y * 64 + x];
-                            alphaData[idx + 3] = alphaLayer3[y * 64 + x];
+                            alphaData[idx] = l0 != null ? l0[y * 64 + x] : (byte)0;
+                            alphaData[idx + 1] = l1 != null ? l1[y * 64 + x] : (byte)0;
+                            alphaData[idx + 2] = l2 != null ? l2[y * 64 + x] : (byte)0;
+                            alphaData[idx + 3] = l3 != null ? l3[y * 64 + x] : (byte)0;
                         }
                     }
 
@@ -303,7 +287,7 @@ namespace WoWRenderLib.DX11.Loaders
                 batch.heightMaterialFDIDs = layerHeights;
                 batch.alphaMaterialID = alphaLayerMats;
                 batch.scales = layerScales;
-                renderBatches.Add(batch);
+                renderBatches[c] = batch;
 
                 chunkBounds[c] = new BoundingBox
                 {
@@ -346,22 +330,21 @@ namespace WoWRenderLib.DX11.Loaders
                 SilkMarshal.ThrowHResult(device.CreateBuffer(in bufferDesc, in subresourceData, ref result.indiceBuffer));
             }
 
-            var doodads = new List<Doodad>(adt.objects.models.entries.Length);
-            var worldModelBatches = new List<WorldModelBatch>(adt.objects.worldModels.entries.Length);
-
+            var doodads = new Doodad[adt.objects.models.entries.Length];
             for (var mi = 0; mi < adt.objects.models.entries.Length; mi++)
             {
                 var modelentry = adt.objects.models.entries[mi];
 
-                doodads.Add(new Doodad
+                doodads[mi] = new Doodad
                 {
                     position = new Vector3(-(modelentry.position.X - 17066), modelentry.position.Y, (modelentry.position.Z - 17066)),
                     rotation = new Vector3(modelentry.rotation.X, modelentry.rotation.Y, modelentry.rotation.Z),
                     scale = modelentry.scale / 1024.0f,
                     fileDataID = modelentry.mmidEntry
-                });
+                };
             }
 
+            var worldModelBatches = new WorldModelBatch[adt.objects.worldModels.entries.Length];
             for (var wmi = 0; wmi < adt.objects.worldModels.entries.Length; wmi++)
             {
                 var wmodelentry = adt.objects.worldModels.entries[wmi];
@@ -385,7 +368,7 @@ namespace WoWRenderLib.DX11.Loaders
                     }
                 }
 
-                worldModelBatches.Add(new WorldModelBatch
+                worldModelBatches[wmi] = new WorldModelBatch
                 {
                     position = new Vector3(-(wmodelentry.position.X - 17066.666f), wmodelentry.position.Y, (wmodelentry.position.Z - 17066.666f)),
                     rotation = new Vector3(wmodelentry.rotation.X, wmodelentry.rotation.Y, wmodelentry.rotation.Z),
@@ -393,12 +376,12 @@ namespace WoWRenderLib.DX11.Loaders
                     uniqueID = wmodelentry.uniqueId,
                     scale = wmodelentry.scale / 1024.0f,
                     doodadSetIDs = [.. doodadSets]
-                });
+                };
             }
 
-            result.renderBatches = [.. renderBatches];
-            result.doodads = [.. doodads];
-            result.worldModelBatches = [.. worldModelBatches];
+            result.renderBatches = renderBatches;
+            result.doodads = doodads;
+            result.worldModelBatches = worldModelBatches;
             result.rootADTFileDataID = rootADTFileDataID;
             result.chunkBounds = chunkBounds;
             result.blpFileDataIDs = [.. usedBLPFileDataIDs];

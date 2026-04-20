@@ -1,9 +1,7 @@
 ﻿using Silk.NET.Core.Native;
 using Silk.NET.Direct3D11;
 using System.Numerics;
-using WoWFormatLib.Structs.WMO;
 using WoWRenderLib.DX11.Cache;
-using WoWRenderLib.DX11.Managers;
 using WoWRenderLib.DX11.Raycasting;
 using WoWRenderLib.DX11.Structs;
 
@@ -11,8 +9,6 @@ namespace WoWRenderLib.DX11.Objects
 {
     public class WMOContainer : Container3D
     {
-        private readonly ComPtr<ID3D11Device> _device;
-        private readonly CompiledShader _shaderProgram;
         private bool[]? enabledGroups;
         private bool[]? enabledDoodadSets;
 
@@ -93,19 +89,17 @@ namespace WoWRenderLib.DX11.Objects
         // TODO: This is a bit of a hack -- this is what sets should be enabled AFTER the WMO is actually loaded, so we use it above to ensure things are always loaded correctly. Keep in mind when doing async rework.
         public List<uint> DoodadSetsToEnable = [];
 
-        public WMOContainer(ComPtr<ID3D11Device> device, uint fileDataID, CompiledShader shaderProgram, uint parentFileDataId) : base(device, fileDataID, shaderProgram, parentFileDataId)
+        public WMOContainer(ComPtr<ID3D11Device> device, uint fileDataID, uint parentFileDataId) : base(device, fileDataID, parentFileDataId)
         {
-            _device = device;
-            _shaderProgram = shaderProgram;
-
+            GetWMO(true);
             // Trigger initial array creation
             _ = EnabledGroups;
             _ = EnabledDoodadSets;
         }
 
-        private Structs.WorldModel GetWMO()
+        public Structs.WorldModel GetWMO(bool keepTrack = false)
         {
-            return WMOCache.GetOrLoad(_device, FileDataId, _shaderProgram, ParentFileDataId, false);
+            return WMOCache.GetOrLoad(_device, FileDataId, ParentFileDataId, keepTrack);
         }
 
         public void ToggleGroup(string name)

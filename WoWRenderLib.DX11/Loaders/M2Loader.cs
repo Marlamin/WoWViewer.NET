@@ -1,13 +1,11 @@
 ﻿using Silk.NET.Core.Native;
 using Silk.NET.Direct3D11;
 using System.Numerics;
-using System.Runtime.InteropServices;
 using WoWFormatLib.FileProviders;
 using WoWFormatLib.FileReaders;
 using WoWFormatLib.Structs.M2;
 using WoWFormatLib.Structs.SKIN;
 using WoWRenderLib.DX11.Cache;
-using WoWRenderLib.DX11.Managers;
 using WoWRenderLib.DX11.Structs;
 using static WoWRenderLib.DX11.Renderer.ShaderEnums;
 
@@ -17,9 +15,9 @@ namespace WoWRenderLib.DX11.Loaders
     {
         private static uint DEFAULT_TEXTURE_ID = 186184; // dungeons/textures/testing/color_01.blp
 
-        public static unsafe DoodadBatch LoadM2(ComPtr<ID3D11Device> device, uint fileDataID, CompiledShader shaderProgram)
+        public static ParsedM2 ParseM2(uint fileDataID)
         {
-            M2Model model = new M2Model();
+            M2Model model = new();
 
             if (FileProvider.FileExists(fileDataID))
             {
@@ -36,9 +34,9 @@ namespace WoWRenderLib.DX11.Loaders
             float bbRadius;
 
             if (
-                model.boundingbox == null || 
-                model.boundingbox.Length < 2 || 
-                (model.boundingbox[0] == Vector3.Zero && model.boundingbox[1] == Vector3.Zero) || 
+                model.boundingbox == null ||
+                model.boundingbox.Length < 2 ||
+                (model.boundingbox[0] == Vector3.Zero && model.boundingbox[1] == Vector3.Zero) ||
                 (model.boundingbox[1] == new Vector3(-10000000, -10000000, -10000000) && model.boundingbox[0] == new Vector3(10000000, 10000000, 10000000))
                 )
             {
@@ -72,7 +70,7 @@ namespace WoWRenderLib.DX11.Loaders
                 bbRadius = model.boundingradius;
             }
 
-            var doodadBatch = new DoodadBatch()
+            var doodadBatch = new ParsedM2()
             {
                 boundingBox = new BoundingBox()
                 {
@@ -116,7 +114,6 @@ namespace WoWRenderLib.DX11.Loaders
                     textureFileDataID = DEFAULT_TEXTURE_ID;
 
                 doodadBatch.mats[i].fileDataID = textureFileDataID;
-                // doodadBatch.mats[i].textureID = BLPCache.GetOrLoad(device, textureFileDataID, fileDataID);
             }
 
             // Submeshes
@@ -130,7 +127,7 @@ namespace WoWRenderLib.DX11.Loaders
                 if (batch.flags.HasFlag(TextureUnitFlags.ProjectedTexture))
                     continue;
 
-                var materials = new List<uint>();
+                var materials = new uint[batch.textureCount];
                 var firstFace = skinSection.startTriangle;
                 var numFaces = skinSection.nTriangles;
                 var blendType = model.renderflags[batch.renderFlagsIndex].blendingMode;
@@ -140,17 +137,14 @@ namespace WoWRenderLib.DX11.Loaders
                 for (var tm = 0; tm < batch.textureCount; tm++)
                 {
                     var textureID = model.texlookup[batch.texture + tm].textureID;
-                    materials.Add(doodadBatch.mats[textureID].fileDataID);
-
-                    // TODO: do we want to do this in this loop? does this create too many users?
-                    BLPCache.GetOrLoad(device, doodadBatch.mats[textureID].fileDataID, fileDataID);
+                    materials[tm] = doodadBatch.mats[textureID].fileDataID;
                 }
 
                 submeshes.Add(new Structs.Submesh()
                 {
                     firstFace = firstFace,
                     numFaces = numFaces,
-                    material = [.. materials],
+                    material = materials,
                     blendType = blendType,
                     index = i,
                     vertexShaderID = vertexShaderID,
@@ -170,18 +164,66 @@ namespace WoWRenderLib.DX11.Loaders
                 modelvertices[i].TexCoord2 = new Vector2(model.vertices[i].textureCoordX2, model.vertices[i].textureCoordY2);
             }
 
+            unsafe
+            {
+                fixed (M2Vertex* ptr = modelvertices)
+                {
+                    doodadBatch.vertexBytes = new byte[modelvertices.Length * sizeof(M2Vertex)];
+                    fixed (byte* dst = doodadBatch.vertexBytes)
+                        Buffer.MemoryCopy(ptr, dst, doodadBatch.vertexBytes.Length, doodadBatch.vertexBytes.Length);
+                }
+            }
+
+            var modelindices = new ushort[model.skins[0].triangles.Length * 3];
+
+            for (var i = 0; i < model.skins[0].triangles.Length; i++)
+            {
+                modelindices[i * 3] = model.skins[0].triangles[i].pt1;
+                modelindices[i * 3 + 1] = model.skins[0].triangles[i].pt2;
+                modelindices[i * 3 + 2] = model.skins[0].triangles[i].pt3;
+            }
+
+            unsafe
+            {
+                fixed (ushort* ptr = modelindices)
+                {
+                    doodadBatch.indiceBytes = new byte[modelindices.Length * sizeof(ushort)];
+                    fixed (byte* dst = doodadBatch.indiceBytes)
+                        Buffer.MemoryCopy(ptr, dst, doodadBatch.indiceBytes.Length, doodadBatch.indiceBytes.Length);
+                }
+            }
+
+            return doodadBatch;
+        }
+
+        public static unsafe DoodadBatch LoadM2(ComPtr<ID3D11Device> device, ParsedM2 parsedM2)
+        {
+            var doodadBatch = new DoodadBatch()
+            {
+                boundingBox = parsedM2.boundingBox,
+                boundingRadius = parsedM2.boundingRadius,
+                fileDataID = parsedM2.fileDataID,
+                mats = parsedM2.mats,
+                submeshes = parsedM2.submeshes
+            };
+
+            foreach (var mat in doodadBatch.mats)
+            {
+                BLPCache.GetOrLoad(device, mat.fileDataID, parsedM2.fileDataID);
+            }
+
             ComPtr<ID3D11Buffer> vertexBuffer = default;
 
-            if (modelvertices.Length > 0)
+            if (parsedM2.vertexBytes.Length > 0)
             {
                 var bufferDesc = new BufferDesc
                 {
-                    ByteWidth = (uint)Marshal.SizeOf<M2Vertex>() * (uint)modelvertices.Length,
+                    ByteWidth = (uint)parsedM2.vertexBytes.Length,
                     Usage = Usage.Default,
                     BindFlags = (uint)BindFlag.VertexBuffer
                 };
 
-                fixed (M2Vertex* vertexData = modelvertices)
+                fixed (byte* vertexData = parsedM2.vertexBytes)
                 {
                     var subresourceData = new SubresourceData
                     {
@@ -194,27 +236,18 @@ namespace WoWRenderLib.DX11.Loaders
 
             doodadBatch.vertexBuffer = vertexBuffer;
 
-            var modelindices = new ushort[model.skins[0].triangles.Length * 3];
-
-            for (var i = 0; i < model.skins[0].triangles.Length; i++)
-            {
-                modelindices[i * 3] = model.skins[0].triangles[i].pt1;
-                modelindices[i * 3 + 1] = model.skins[0].triangles[i].pt2;
-                modelindices[i * 3 + 2] = model.skins[0].triangles[i].pt3;
-            }
-
             ComPtr<ID3D11Buffer> indiceBuffer = default;
 
-            if (modelindices.Length > 0)
+            if (parsedM2.indiceBytes.Length > 0)
             {
                 var bufferDesc = new BufferDesc
                 {
-                    ByteWidth = (uint)(modelindices.Length * sizeof(ushort)),
+                    ByteWidth = (uint)parsedM2.indiceBytes.Length,
                     Usage = Usage.Default,
                     BindFlags = (uint)BindFlag.IndexBuffer
                 };
 
-                fixed (ushort* indiceData = modelindices)
+                fixed (byte* indiceData = parsedM2.indiceBytes)
                 {
                     var subresourceData = new SubresourceData
                     {
@@ -320,14 +353,10 @@ namespace WoWRenderLib.DX11.Loaders
             model.vertexBuffer.Dispose();
             model.indiceBuffer.Dispose();
 
-            foreach (var submesh in model.submeshes)
+            foreach (var material in model.mats)
             {
-                foreach(var material in submesh.material)
-                {
-                    BLPCache.Release(material, model.fileDataID);
-                }
+                BLPCache.Release(material.fileDataID, model.fileDataID);
             }
-
         }
     }
 }

@@ -4,7 +4,6 @@ using System.Numerics;
 using WoWFormatLib.FileReaders;
 using WoWFormatLib.Structs.WMO;
 using WoWRenderLib.DX11.Cache;
-using WoWRenderLib.DX11.Managers;
 using WoWRenderLib.DX11.Renderer;
 using WoWRenderLib.DX11.Services;
 using WoWRenderLib.DX11.Structs;
@@ -244,7 +243,7 @@ namespace WoWRenderLib.DX11.Loaders
             };
         }
 
-        public static unsafe WorldModel LoadWMO(PreppedWMO preppedWMO, ComPtr<ID3D11Device> device, CompiledShader shaderProgram)
+        public static unsafe WorldModel LoadWMO(PreppedWMO preppedWMO, ComPtr<ID3D11Device> device)
         {
             var wmoBatch = new WorldModel()
             {

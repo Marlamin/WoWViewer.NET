@@ -2,7 +2,6 @@
 using Silk.NET.Direct3D11;
 using System.Diagnostics;
 using WoWRenderLib.DX11.Loaders;
-using WoWRenderLib.DX11.Managers;
 using WoWRenderLib.DX11.Structs;
 
 namespace WoWRenderLib.DX11.Cache
@@ -12,7 +11,7 @@ namespace WoWRenderLib.DX11.Cache
         private static readonly Dictionary<string, Terrain> Cache = [];
         private static readonly Dictionary<string, List<uint>> Users = [];
 
-        public static Terrain GetOrLoad(ComPtr<ID3D11Device> device, MapTile mapTile, CompiledShader shaderProgram, uint parent)
+        public static Terrain GetOrLoad(ComPtr<ID3D11Device> device, MapTile mapTile, uint parent)
         {
             var key = (mapTile.wdtFileDataID, mapTile.tileX, mapTile.tileY).ToString();
 
@@ -24,7 +23,7 @@ namespace WoWRenderLib.DX11.Cache
             if (Cache.TryGetValue(key, out Terrain value))
                 return value;
 
-            Cache.TryAdd(key, ADTLoader.LoadADT(device, mapTile, shaderProgram));
+            Cache.TryAdd(key, ADTLoader.LoadADT(device, mapTile));
 
             return Cache[key];
         }
