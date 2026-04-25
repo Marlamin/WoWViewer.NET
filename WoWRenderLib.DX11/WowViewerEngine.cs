@@ -78,7 +78,15 @@ namespace WoWRenderLib.DX11
         private ComPtr<ID3D11Device> device = default;
         private ComPtr<ID3D11DeviceContext> deviceContext = default;
         private ComPtr<IDXGIFactory2> factory = default;
-        private ComPtr<IDXGISwapChain1> swapchain = default;
+
+        private ComPtr<ID3D11Texture2D> sharedTexture = default;
+        private ComPtr<ID3D11RenderTargetView> _sharedRTV = default;
+        public ComPtr<ID3D11ShaderResourceView> SharedSRV { get; private set; }
+        public uint SharedTextureWidth => (uint)viewportWidth;
+        public uint SharedTextureHeight => (uint)viewportHeight;
+
+        public bool IsInitialized = false;
+        public bool IsInitializing = false;
 
         private bool cascLoaded = false;
 
@@ -124,7 +132,7 @@ namespace WoWRenderLib.DX11
         private uint _maxDeltaMS = 500; // update fps every x ms
 
         private string[] wowProductList = [];
-
+        private IntPtr _cachedSharedHandle = IntPtr.Zero;
         public WowViewerEngine(WowClientConfig wowConfig, IImGuiBackend? imguiBackend, bool renderImGUI)
         {
             _wowConfig = wowConfig;
@@ -154,9 +162,13 @@ namespace WoWRenderLib.DX11
         }
 
         // Load
-        public void Initialize(DXGI dxgi, ComPtr<IDXGISwapChain1> swapchain, ComPtr<ID3D11Device> device, ComPtr<ID3D11DeviceContext> deviceContext, Vector2D<int> frameBufferSize)
+        public void Initialize(DXGI dxgi, ComPtr<ID3D11Device> device, ComPtr<ID3D11DeviceContext> deviceContext, Vector2D<int> frameBufferSize)
         {
-            this.swapchain = swapchain;
+            Console.WriteLine("Initializing WowViewerEngine..."); ;
+            if(IsInitializing) return;
+
+            IsInitializing = true;
+
             this.device = device;
             this.deviceContext = deviceContext;
 
@@ -169,7 +181,7 @@ namespace WoWRenderLib.DX11
             }
 
             shaderManager = new ShaderManager(device, Path.Combine(exeLocation, "Shaders"));
-            sceneManager = new SceneManager(device, swapchain, deviceContext, shaderManager);
+            sceneManager = new SceneManager(device, deviceContext, shaderManager);
 
             // imgui?.Initialize();
 
@@ -196,25 +208,70 @@ namespace WoWRenderLib.DX11
             Resize((uint)frameBufferSize.X, (uint)frameBufferSize.Y);
 
             LoadCurrentProduct();
+            IsInitialized = true;
+            IsInitializing = false;
+
         }
 
-        public void Resize(uint width, uint height)
+        public unsafe void Resize(uint width, uint height)
         {
+            if (width == 0 || height == 0)
+                return;
+
             if (viewportWidth == (int)width && viewportHeight == (int)height)
+                return;
+
+            if (device.Handle == null)
                 return;
 
             viewportWidth = (int)width;
             viewportHeight = (int)height;
+            _cachedSharedHandle = IntPtr.Zero;
 
-            activeCamera.AspectRatio = (float)width / (float)height;
+            if (activeCamera != null)
+                activeCamera.AspectRatio = (float)width / (float)height;
 
-            // Resize the swapchain buffers BEFORE recreating size-dependent resources
-            swapchain.ResizeBuffers(0, width, height, Format.FormatUnknown, 0);
+            // Release old shared resources
+            if (_sharedRTV.Handle != null) { _sharedRTV.Dispose(); _sharedRTV = default; }
+            var oldSrv = SharedSRV;
+            if (oldSrv.Handle != null) { oldSrv.Dispose(); SharedSRV = default; }
+            if (sharedTexture.Handle != null) { sharedTexture.Dispose(); sharedTexture = default; }
 
-            if (sceneManager != null)
-                sceneManager.Resize(width, height);
+            var texDesc = new Texture2DDesc
+            {
+                Width = width,
+                Height = height,
+                MipLevels = 1,
+                ArraySize = 1,
+                Format = Format.FormatB8G8R8A8Unorm,
+                SampleDesc = new SampleDesc(1, 0),
+                Usage = Usage.Default,
+                BindFlags = (uint)(BindFlag.RenderTarget | BindFlag.ShaderResource),
+                MiscFlags = (uint)(ResourceMiscFlag.Shared  )
+            };
+            device.CreateTexture2D(in texDesc, null, ref sharedTexture);
+            device.CreateRenderTargetView(sharedTexture, null, ref _sharedRTV);
+            ComPtr<ID3D11ShaderResourceView> srv = default;
+            device.CreateShaderResourceView(sharedTexture, null, ref srv);
+            SharedSRV = srv;
+
+            sceneManager?.Resize(width, height, _sharedRTV);
         }
 
+        public unsafe IntPtr GetSharedTextureHandle()
+        {
+            if (sharedTexture.Handle == null) return IntPtr.Zero;
+
+            if (_cachedSharedHandle != IntPtr.Zero)
+                return _cachedSharedHandle;
+
+            var resource = sharedTexture.QueryInterface<IDXGIResource>();
+            void* handle = null;
+            SilkMarshal.ThrowHResult(resource.GetSharedHandle(&handle));
+            resource.Dispose();
+            _cachedSharedHandle = (IntPtr)handle;
+            return _cachedSharedHandle;
+        }
         public void Update(double deltaTime, InputFrame input)
         {
             HandleMouseLook(input, false, (float)deltaTime);
@@ -247,6 +304,7 @@ namespace WoWRenderLib.DX11
 
         public void Render(double deltaTime)
         {
+            if(!IsInitialized) return;
             frameDelta = (uint)(deltaTime * 1000);
 
             sceneManager.UpdateTilesByCameraPos(activeCamera.Position);
@@ -287,6 +345,9 @@ namespace WoWRenderLib.DX11
             if (disposed)
                 return;
 
+            _sharedRTV.Dispose();
+            SharedSRV.Dispose();
+            sharedTexture.Dispose();
             shaderManager.Dispose();
             sceneManager?.Dispose();
             imgui?.Dispose();
@@ -476,6 +537,7 @@ namespace WoWRenderLib.DX11
 
         private void HandleKeyboardMovement(InputFrame input, float deltaTime)
         {
+            if (!IsInitialized) return;
             float moveSpeed = movementSpeed * deltaTime;
 
             Vector3 currentPos = activeCamera.Position;

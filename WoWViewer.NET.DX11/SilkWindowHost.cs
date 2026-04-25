@@ -1,10 +1,12 @@
 ﻿using Silk.NET.Core.Native;
+using Silk.NET.Direct3D.Compilers;
 using Silk.NET.Direct3D11;
 using Silk.NET.DXGI;
 using Silk.NET.Input;
 using Silk.NET.Maths;
 using Silk.NET.Windowing;
 using System.Runtime.CompilerServices;
+using System.Text;
 using WoWRenderLib.DX11;
 
 namespace WoWViewer.NET.DX11
@@ -32,10 +34,15 @@ namespace WoWViewer.NET.DX11
 
         private ComPtr<ID3D11Device> device = default;
         private ComPtr<ID3D11DeviceContext> deviceContext = default;
+        private ComPtr<ID3D11DeviceContext1> deviceContext1 = default;
         private ComPtr<IDXGIFactory2> factory = default;
         private ComPtr<IDXGISwapChain1> swapchain = default;
 
 
+        private ComPtr<ID3D11RenderTargetView> backbufferRTV = default;
+        private ComPtr<ID3D11VertexShader> vertexShader = default;
+        private ComPtr<ID3D11PixelShader> pixelShader = default;
+        private ComPtr<ID3D11SamplerState> sampler = default;
 
         public SilkWindowHost(WowClientConfig wowConfig)
         {
@@ -69,6 +76,12 @@ namespace WoWViewer.NET.DX11
 
         private void OnClose()
         {
+            vertexShader.Dispose();
+            pixelShader.Dispose();
+            sampler.Dispose();
+            backbufferRTV.Dispose();
+            wowViewerEngine.Dispose();
+            swapchain.Dispose();
             device.Dispose();
             deviceContext.Dispose();
             d3d11.Dispose();
@@ -104,6 +117,8 @@ namespace WoWViewer.NET.DX11
                     ref deviceContext
                 )
             );
+
+            deviceContext1 = deviceContext.QueryInterface<ID3D11DeviceContext1>();
 
 #if (DEBUG)
             //This is not supported under DXVK 
@@ -151,12 +166,129 @@ namespace WoWViewer.NET.DX11
                 )
             );
 
-            wowViewerEngine.Initialize(dxgi, swapchain, device, deviceContext, window.FramebufferSize);
-            wowViewerEngine.Resize((uint)window.FramebufferSize.X, (uint)window.FramebufferSize.Y);
+            wowViewerEngine.Initialize(dxgi, device, deviceContext, window.FramebufferSize);
+            CreateBackbufferRTV();
+            CreateShaders();
+            CreateSampler();
         }
 
-        private void OnResize(Vector2D<int> frameBufferSize)
+        private unsafe void CreateBackbufferRTV()
         {
+            if (backbufferRTV.Handle != null) backbufferRTV.Dispose();
+
+            ComPtr<ID3D11Texture2D> backbuffer = default;
+            swapchain.GetBuffer(0, out backbuffer);
+            device.CreateRenderTargetView(backbuffer, null, ref backbufferRTV);
+            backbuffer.Dispose();
+        }
+
+        private unsafe void CreateShaders()
+        {
+            const string hlsl = @"
+                Texture2D tex : register(t0);
+                SamplerState samp : register(s0);
+                struct VS_OUT { float4 pos : SV_Position; float2 uv : TEXCOORD0; };
+                VS_OUT VS_Main(uint id : SV_VertexID) {
+                    VS_OUT o;
+                    o.uv  = float2((id & 1) * 2.0, (id >> 1) * 2.0);
+                    o.pos = float4(o.uv * float2(2,-2) + float2(-1,1), 0, 1);
+                    return o;
+                }
+                float4 PS_Main(VS_OUT i) : SV_Target { return tex.Sample(samp, i.uv); }
+            ";
+
+            var compiler = D3DCompiler.GetApi();
+            var shaderBytes = Encoding.ASCII.GetBytes(hlsl);
+
+            ComPtr<ID3D10Blob> vertexCode = default;
+            ComPtr<ID3D10Blob> vertexErrors = default;
+            HResult hr = compiler.Compile(
+                in shaderBytes[0],
+                (nuint)shaderBytes.Length,
+                nameof(hlsl),
+                null,
+                ref Unsafe.NullRef<ID3DInclude>(),
+                "VS_Main",
+                "vs_5_0",
+                0, 0,
+                ref vertexCode,
+                ref vertexErrors
+            );
+
+            if (hr.IsFailure)
+            {
+                if (vertexErrors.Handle is not null)
+                    Console.WriteLine(SilkMarshal.PtrToString((nint)vertexErrors.GetBufferPointer()));
+                hr.Throw();
+            }
+
+            ComPtr<ID3D10Blob> pixelCode = default;
+            ComPtr<ID3D10Blob> pixelErrors = default;
+            hr = compiler.Compile(
+                in shaderBytes[0],
+                (nuint)shaderBytes.Length,
+                nameof(hlsl),
+                null,
+                ref Unsafe.NullRef<ID3DInclude>(),
+                "PS_Main",
+                "ps_5_0",
+                0, 0,
+                ref pixelCode,
+                ref pixelErrors
+            );
+
+            if (hr.IsFailure)
+            {
+                if (pixelErrors.Handle is not null)
+                    Console.WriteLine(SilkMarshal.PtrToString((nint)pixelErrors.GetBufferPointer()));
+                hr.Throw();
+            }
+
+            SilkMarshal.ThrowHResult(device.CreateVertexShader(
+                vertexCode.GetBufferPointer(),
+                vertexCode.GetBufferSize(),
+                ref Unsafe.NullRef<ID3D11ClassLinkage>(),
+                ref vertexShader
+            ));
+
+            SilkMarshal.ThrowHResult(device.CreatePixelShader(
+                pixelCode.GetBufferPointer(),
+                pixelCode.GetBufferSize(),
+                ref Unsafe.NullRef<ID3D11ClassLinkage>(),
+                ref pixelShader
+            ));
+
+            vertexCode.Dispose();
+            vertexErrors.Dispose();
+            pixelCode.Dispose();
+            pixelErrors.Dispose();
+        }
+
+        private void CreateSampler()
+        {
+            var sampDesc = new SamplerDesc
+            {
+                Filter = Filter.MinMagMipPoint,
+                AddressU = TextureAddressMode.Clamp,
+                AddressV = TextureAddressMode.Clamp,
+                AddressW = TextureAddressMode.Clamp,
+            };
+            device.CreateSamplerState(in sampDesc, ref sampler);
+        }
+
+        private unsafe void OnResize(Vector2D<int> frameBufferSize)
+        {
+            if (frameBufferSize.X == 0 || frameBufferSize.Y == 0)
+                return;
+
+            deviceContext.ClearState();
+            deviceContext.Flush();
+
+            if (backbufferRTV.Handle != null) { backbufferRTV.Dispose(); backbufferRTV = default; }
+
+            swapchain.ResizeBuffers(0, (uint)frameBufferSize.X, (uint)frameBufferSize.Y, Format.FormatUnknown, 0);
+
+            CreateBackbufferRTV();
             wowViewerEngine.Resize((uint)frameBufferSize.X, (uint)frameBufferSize.Y);
         }
 
@@ -194,7 +326,24 @@ namespace WoWViewer.NET.DX11
                 return; // can cap fps instead
 
             wowViewerEngine.Render(deltaTime);
+
+            var srv = wowViewerEngine.SharedSRV;
+
+            var viewport = new Viewport(0, 0, viewportWidth, viewportHeight, 0f, 1f);
+            deviceContext.RSSetViewports(1, in viewport);
+            deviceContext1.OMSetRenderTargets(1, ref backbufferRTV, ref Unsafe.NullRef<ID3D11DepthStencilView>());
+            deviceContext.VSSetShader(vertexShader, null, 0);
+            deviceContext.PSSetShader(pixelShader, null, 0);
+            deviceContext.PSSetShaderResources(0, 1, ref srv);
+            deviceContext.PSSetSamplers(0, 1, ref sampler);
+            deviceContext.IASetPrimitiveTopology(D3DPrimitiveTopology.D3D11PrimitiveTopologyTrianglelist);
+            deviceContext.Draw(3, 0);
+
+            swapchain.Present(1, 0);
         }
+
+        private int viewportWidth => wowViewerEngine != null ? (int)window.FramebufferSize.X : 1;
+        private int viewportHeight => wowViewerEngine != null ? (int)window.FramebufferSize.Y : 1;
 
         private void OnFocusChanged(bool focused)
         {

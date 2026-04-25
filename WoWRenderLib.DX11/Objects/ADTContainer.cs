@@ -1,7 +1,6 @@
 ﻿using Silk.NET.Core.Native;
 using Silk.NET.Direct3D11;
 using System.Numerics;
-using WoWRenderLib.DX11.Managers;
 using WoWRenderLib.DX11.Structs;
 
 namespace WoWRenderLib.DX11.Objects

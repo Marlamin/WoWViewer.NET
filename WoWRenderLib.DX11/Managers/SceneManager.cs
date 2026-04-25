@@ -15,7 +15,7 @@ using WoWRenderLib.DX11.Structs;
 
 namespace WoWRenderLib.DX11.Managers
 {
-    public class SceneManager(ComPtr<ID3D11Device> device, ComPtr<IDXGISwapChain1> swapchain, ComPtr<ID3D11DeviceContext> deviceContext, ShaderManager shaderManager) : IDisposable
+    public class SceneManager(ComPtr<ID3D11Device> device, ComPtr<ID3D11DeviceContext> deviceContext, ShaderManager shaderManager) : IDisposable
     {
         private readonly ShaderManager _shaderManager = shaderManager ?? throw new ArgumentNullException(nameof(shaderManager));
         public List<Container3D> SceneObjects { get; } = [];
@@ -64,7 +64,6 @@ namespace WoWRenderLib.DX11.Managers
         private int m2AlphaRefLoc;
         private int wmoAlphaRefLoc;
 
-        private readonly ComPtr<IDXGISwapChain1> _swapChain = swapchain;
         private ComPtr<ID3D11Buffer> adtPerObjectConstantBuffer = default;
         private ComPtr<ID3D11Buffer> layerDataConstantBuffer = default;
         private ComPtr<ID3D11Buffer> wmoPerObjectConstantBuffer = default;
@@ -247,7 +246,6 @@ namespace WoWRenderLib.DX11.Managers
                 deviceContext.RSSetState(rastState);
 
                 CreateBBoxBuffers();
-                CreateSizeDependentResources(1920, 1080);
             }
         }
 
@@ -272,20 +270,17 @@ namespace WoWRenderLib.DX11.Managers
             SilkMarshal.ThrowHResult(device.CreateBuffer(in vbDesc, null, ref bboxVertexBuffer));
         }
 
-        private unsafe void CreateSizeDependentResources(uint width, uint height)
+        private unsafe void CreateSizeDependentResources(uint width, uint height, ComPtr<ID3D11RenderTargetView> rtv)
         {
-            using var framebuffer = _swapChain.GetBuffer<ID3D11Texture2D>(0);
-            SilkMarshal.ThrowHResult(device.CreateRenderTargetView(framebuffer, null, ref renderTargetView));
+            if (width == 0 || height == 0)
+                return;
 
-            Texture2DDesc backbufferDesc = default;
-            framebuffer.GetDesc(ref backbufferDesc);
-            uint actualWidth = backbufferDesc.Width;
-            uint actualHeight = backbufferDesc.Height;
+            renderTargetView = rtv;
 
             var depthDesc = new Texture2DDesc
             {
-                Width = actualWidth,
-                Height = actualHeight,
+                Width = width,
+                Height = height,
                 MipLevels = 1,
                 ArraySize = 1,
                 Format = Format.FormatD24UnormS8Uint,
@@ -300,26 +295,30 @@ namespace WoWRenderLib.DX11.Managers
             {
                 TopLeftX = 0,
                 TopLeftY = 0,
-                Width = actualWidth,
-                Height = actualHeight,
+                Width = width,
+                Height = height,
                 MinDepth = 0.0f,
                 MaxDepth = 1.0f
             };
             deviceContext.RSSetViewports(1, in viewport);
 
-            _renderWidth = actualWidth;
-            _renderHeight = actualHeight;
+            _renderWidth = width;
+            _renderHeight = height;
         }
 
-        public unsafe void Resize(uint width, uint height)
+        public unsafe void Resize(uint width, uint height, ComPtr<ID3D11RenderTargetView> rtv)
         {
-            deviceContext.OMSetRenderTargets(0, (ID3D11RenderTargetView**)null, (ID3D11DepthStencilView*)null);
+            if (width == 0 || height == 0)
+                return;
 
-            if (renderTargetView.Handle != null) { renderTargetView.Dispose(); renderTargetView = default; }
+            deviceContext.OMSetRenderTargets(0, (ID3D11RenderTargetView**)null, (ID3D11DepthStencilView*)null);
+            deviceContext.ClearState();
+
+            renderTargetView = default; // don't dispose, we dont own it!
             if (depthStencilView.Handle != null) { depthStencilView.Dispose(); depthStencilView = default; }
             if (depthTexture.Handle != null) { depthTexture.Dispose(); depthTexture = default; }
 
-            CreateSizeDependentResources(width, height);
+            CreateSizeDependentResources(width, height, rtv);
         }
 
         public void LoadWDT(uint wdtFileDataID)
@@ -1133,7 +1132,7 @@ namespace WoWRenderLib.DX11.Managers
                 deviceContext.OMSetDepthStencilState(nullDSS, 0);
             }
 
-            swapchain.Present(1, 0);
+            //swapchain.Present(1, 0);
 
             gizmoWasUsing = false;
             gizmoWasOver = false;
@@ -1412,7 +1411,6 @@ namespace WoWRenderLib.DX11.Managers
 
                 textureSampler.Dispose();
                 clampSampler.Dispose();
-                renderTargetView.Dispose();
                 depthStencilView.Dispose();
                 depthTexture.Dispose();
                 adtPerObjectConstantBuffer.Dispose();
