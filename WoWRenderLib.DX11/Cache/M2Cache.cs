@@ -97,7 +97,7 @@ namespace WoWRenderLib.DX11.Cache
             if (cachedDevice == null)
                 return;
 
-            while (queueTimer.ElapsedMilliseconds < 5)
+            while (queueTimer.ElapsedMilliseconds < 10)
             {
                 if (!uploadQueue.TryDequeue(out var item))
                     return;

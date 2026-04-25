@@ -243,7 +243,7 @@ namespace WoWRenderLib.Loaders
                     var diffuseTextureID = adt.diffuseTextureFileDataIDs[chunk.layers[li].textureId];
 
                     if (chunk.alphaLayer != null)
-                        alphaLayers.Add(li, chunk.alphaLayer[li].layer);
+                        alphaLayers.Add(li, chunk.alphaLayer[li]);
 
                     ADTMaterial curMat = materials[diffuseTextureID];
                     layerMaterials[li] = (int)BLPCache.GetOrLoad(gl, diffuseTextureID, rootADTFileDataID);
