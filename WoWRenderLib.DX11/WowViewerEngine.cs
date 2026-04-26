@@ -196,7 +196,7 @@ namespace WoWRenderLib.DX11
 
             WDTFDIDInput = sceneManager.CurrentWDTFileDataID.ToString();
             // var startPos = new Vector3(3875f, -2050f, 616f);
-            var startPos = new Vector3(0, 0, 500);
+            var startPos = new Vector3(0, 0, 200);
             // Init camera
             activeCamera = new Camera(
                 startPos,

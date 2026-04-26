@@ -16,6 +16,32 @@ namespace WoWRenderLib.DX11.Structs
         public float _pad0; // pad to 16 byte boundary
     }
 
+    public struct ParsedADT
+    {
+        public uint rootADTFileDataID;
+        public uint vao;
+        public byte[] vertexBuffer;
+        public byte[] indiceBuffer;
+        public Vector3 startPos;
+        public ParsedADTRenderBatch[] renderBatches;
+        public WorldModelBatch[] worldModelBatches;
+        public Doodad[] doodads;
+        public uint[] blpFileDataIDs;
+        public Vector4 heights;
+        public Vector4 weights;
+        public BoundingBox[] chunkBounds;
+    }
+
+    public struct ParsedADTRenderBatch
+    {
+        public int[] materialFDIDs;
+        public int[] heightMaterialFDIDs;
+        public byte[][] alphaMaterials;
+        public float[] scales;
+        public float[] heightScales;
+        public float[] heightOffsets;
+    }
+
     public struct Terrain
     {
         public uint rootADTFileDataID;
@@ -81,5 +107,4 @@ namespace WoWRenderLib.DX11.Structs
         public float[] heightScales;
         public float[] heightOffsets;
     }
-
 }

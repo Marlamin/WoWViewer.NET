@@ -1,6 +1,8 @@
 ﻿using Silk.NET.Core.Native;
 using Silk.NET.Direct3D11;
+using Silk.NET.Vulkan;
 using System.Numerics;
+using System.Runtime.InteropServices;
 using WoWFormatLib.FileProviders;
 using WoWFormatLib.FileReaders;
 using WoWFormatLib.Structs.ADT;
@@ -11,16 +13,15 @@ namespace WoWRenderLib.DX11.Loaders
 {
     class ADTLoader
     {
-        public static unsafe Terrain LoadADT(ComPtr<ID3D11Device> device, Structs.MapTile mapTile)
+        public static ParsedADT ParseADT(MapTile mapTile)
         {
-            ADT adt = new();
-            Terrain result = new();
+            ParsedADT parsedADT = new();
             ADTReader adtReader = new();
 
             var wdt = WDTCache.GetOrLoad(mapTile.wdtFileDataID);
 
             var rootADTFileDataID = adtReader.LoadADT(wdt, mapTile.tileX, mapTile.tileY, true, "");
-            adt = adtReader.adtfile;
+            var adt = adtReader.adtfile;
 
             var TileSize = 1600.0f / 3.0f; //533.333
             var ChunkSize = TileSize / 16.0f; //33.333
@@ -36,7 +37,6 @@ namespace WoWRenderLib.DX11.Loaders
                 for (var ti = 0; ti < adt.diffuseTextureFileDataIDs.Length; ti++)
                 {
                     var diffuseTextureFDID = adt.diffuseTextureFileDataIDs[ti];
-                    BLPCache.GetOrLoad(device, diffuseTextureFDID, rootADTFileDataID);
 
                     var material = new ADTMaterial
                     {
@@ -57,14 +57,12 @@ namespace WoWRenderLib.DX11.Loaders
                             {
                                 material.heightTexture = (int)diffuseTextureFDID;
                                 usedBLPFileDataIDs.Add(diffuseTextureFDID);
-                                BLPCache.GetOrLoad(device, diffuseTextureFDID, rootADTFileDataID);
                             }
                             else
                             {
                                 var heightTextureFDID = adt.heightTextureFileDataIDs[ti];
                                 material.heightTexture = (int)heightTextureFDID;
                                 usedBLPFileDataIDs.Add(heightTextureFDID);
-                                BLPCache.GetOrLoad(device, heightTextureFDID, rootADTFileDataID);
                             }
                         }
                         else
@@ -90,7 +88,7 @@ namespace WoWRenderLib.DX11.Loaders
             var initialChunkY = adt.chunks[0].header.position.Y;
             var initialChunkX = adt.chunks[0].header.position.X;
 
-            var renderBatches = new ADTRenderBatch[256];
+            var renderBatches = new ParsedADTRenderBatch[256];
 
             var vertices = new ADTVertex[256 * 145];
             var indices = new int[256 * 768];
@@ -102,7 +100,7 @@ namespace WoWRenderLib.DX11.Loaders
             var defaultVertexColor = new Vector4(0.5f, 0.5f, 0.5f, 1.0f);
             for (int c = 0; c < adt.chunks.Length; c++)
             {
-                var batch = new ADTRenderBatch();
+                var batch = new ParsedADTRenderBatch();
 
                 var chunk = adt.chunks[c];
 
@@ -135,7 +133,7 @@ namespace WoWRenderLib.DX11.Loaders
                 }
 
                 if (c == 0)
-                    result.startPos = vertices[0].Position;
+                    parsedADT.startPos = vertices[0].Position;
 
                 holesHighRes[0] = chunk.header.holesHighRes_0;
                 holesHighRes[1] = chunk.header.holesHighRes_1;
@@ -252,8 +250,7 @@ namespace WoWRenderLib.DX11.Loaders
                     heightOffsets[li] = curMat.heightOffset;
                 }
 
-                var alphaLayerMats = new ComPtr<ID3D11ShaderResourceView>[2];
-                Array.Fill(alphaLayerMats, default);
+                var alphaLayerMats = new byte[2][];
 
                 for (int li = 0; li < 2; li++)
                 {
@@ -278,14 +275,14 @@ namespace WoWRenderLib.DX11.Loaders
                         }
                     }
 
-                    alphaLayerMats[li] = BLPLoader.GenerateAlphaTexture(device, alphaData);
+                    alphaLayerMats[li] = alphaData;
                 }
 
                 batch.heightScales = heightScales;
                 batch.heightOffsets = heightOffsets;
                 batch.materialFDIDs = layerMaterials;
                 batch.heightMaterialFDIDs = layerHeights;
-                batch.alphaMaterialID = alphaLayerMats;
+                batch.alphaMaterials = alphaLayerMats;
                 batch.scales = layerScales;
                 renderBatches[c] = batch;
 
@@ -296,39 +293,8 @@ namespace WoWRenderLib.DX11.Loaders
                 };
             }
 
-            var bufferDesc = new BufferDesc
-            {
-                ByteWidth = (uint)(vertices.Length * sizeof(ADTVertex)),
-                Usage = Usage.Default,
-                BindFlags = (uint)BindFlag.VertexBuffer
-            };
-
-            fixed (ADTVertex* vertexData = vertices)
-            {
-                var subresourceData = new SubresourceData
-                {
-                    PSysMem = vertexData
-                };
-
-                SilkMarshal.ThrowHResult(device.CreateBuffer(in bufferDesc, in subresourceData, ref result.vertexBuffer));
-            }
-
-            bufferDesc = new BufferDesc
-            {
-                ByteWidth = (uint)(indices.Length * sizeof(int)),
-                Usage = Usage.Default,
-                BindFlags = (uint)BindFlag.IndexBuffer
-            };
-
-            fixed (int* indexData = indices)
-            {
-                var subresourceData = new SubresourceData
-                {
-                    PSysMem = indexData
-                };
-
-                SilkMarshal.ThrowHResult(device.CreateBuffer(in bufferDesc, in subresourceData, ref result.indiceBuffer));
-            }
+            parsedADT.vertexBuffer = MemoryMarshal.AsBytes(vertices.AsSpan()).ToArray();
+            parsedADT.indiceBuffer = MemoryMarshal.AsBytes(indices.AsSpan()).ToArray();
 
             var doodads = new Doodad[adt.objects.models.entries.Length];
             for (var mi = 0; mi < adt.objects.models.entries.Length; mi++)
@@ -379,18 +345,102 @@ namespace WoWRenderLib.DX11.Loaders
                 };
             }
 
+            parsedADT.renderBatches = renderBatches;
+            parsedADT.doodads = doodads;
+            parsedADT.worldModelBatches = worldModelBatches;
+            parsedADT.rootADTFileDataID = rootADTFileDataID;
+            parsedADT.chunkBounds = chunkBounds;
+            parsedADT.blpFileDataIDs = [.. usedBLPFileDataIDs];
+
+            return parsedADT;
+        }
+
+        public static unsafe Terrain LoadADT(ComPtr<ID3D11Device> device, ParsedADT parsedADT)
+        {
+            Terrain result = new();
+
+            var renderBatches = new ADTRenderBatch[256];
+
+            var holesHighRes = new byte[8];
+            var defaultVertexColor = new Vector4(0.5f, 0.5f, 0.5f, 1.0f);
+            for (var c = 0; c < parsedADT.renderBatches.Length; c++)
+            {
+                var renderBatch = parsedADT.renderBatches[c];
+                var batch = new ADTRenderBatch();
+                var alphaLayerMats = new ComPtr<ID3D11ShaderResourceView>[2];
+                for(var i = 0; i < renderBatch.alphaMaterials.Length; i++)
+                {
+                    if(renderBatch.alphaMaterials[i] == null)
+                    {
+                        alphaLayerMats[i] = default;
+                    }
+                    else
+                    {
+                        alphaLayerMats[i] = BLPLoader.GenerateAlphaTexture(device, renderBatch.alphaMaterials[i]);
+                    }
+                }
+
+                batch.heightScales = renderBatch.heightScales;
+                batch.heightOffsets = renderBatch.heightOffsets;
+                batch.materialFDIDs = renderBatch.materialFDIDs;
+                batch.heightMaterialFDIDs = renderBatch.heightMaterialFDIDs;
+                batch.alphaMaterialID = alphaLayerMats;
+                batch.scales = renderBatch.scales;
+                renderBatches[c] = batch;
+            }
+
+            var bufferDesc = new BufferDesc
+            {
+                ByteWidth = (uint)parsedADT.vertexBuffer.Length,
+                Usage = Usage.Default,
+                BindFlags = (uint)BindFlag.VertexBuffer
+            };
+
+            fixed (byte* vertexData = parsedADT.vertexBuffer)
+            {
+                var subresourceData = new SubresourceData
+                {
+                    PSysMem = vertexData
+                };
+
+                SilkMarshal.ThrowHResult(device.CreateBuffer(in bufferDesc, in subresourceData, ref result.vertexBuffer));
+            }
+
+            bufferDesc = new BufferDesc
+            {
+                ByteWidth = (uint)parsedADT.indiceBuffer.Length,
+                Usage = Usage.Default,
+                BindFlags = (uint)BindFlag.IndexBuffer
+            };
+
+            fixed (byte* indexData = parsedADT.indiceBuffer)
+            {
+                var subresourceData = new SubresourceData
+                {
+                    PSysMem = indexData
+                };
+
+                SilkMarshal.ThrowHResult(device.CreateBuffer(in bufferDesc, in subresourceData, ref result.indiceBuffer));
+            }
+
+            foreach (var usedBLP in parsedADT.blpFileDataIDs)
+                BLPCache.GetOrLoad(device, usedBLP, parsedADT.rootADTFileDataID);
+
+            result.doodads = parsedADT.doodads;
+            result.worldModelBatches = parsedADT.worldModelBatches;
             result.renderBatches = renderBatches;
-            result.doodads = doodads;
-            result.worldModelBatches = worldModelBatches;
-            result.rootADTFileDataID = rootADTFileDataID;
-            result.chunkBounds = chunkBounds;
-            result.blpFileDataIDs = [.. usedBLPFileDataIDs];
+            result.rootADTFileDataID = parsedADT.rootADTFileDataID;
+            result.chunkBounds = parsedADT.chunkBounds;
+            result.blpFileDataIDs = parsedADT.blpFileDataIDs;
 
             return result;
         }
 
         public static void UnloadTerrain(Terrain terrain)
         {
+            if (terrain.renderBatches == null)
+                return;
+
             terrain.vertexBuffer.Dispose();
             terrain.indiceBuffer.Dispose();
 
