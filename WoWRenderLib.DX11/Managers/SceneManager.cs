@@ -990,14 +990,21 @@ namespace WoWRenderLib.DX11.Managers
                 }
             }
 
+            deviceContext.RSSetState(rasterizerState);
+            deviceContext.IASetInputLayout(adtShaderProgram.InputLayout);
+            deviceContext.VSSetShader(adtShaderProgram.VertexShader, ref nullClassInstance, 0);
+            deviceContext.PSSetShader(adtShaderProgram.PixelShader, ref nullClassInstance, 0);
+            deviceContext.VSSetConstantBuffers(0, 1, ref adtPerObjectConstantBuffer);
+            deviceContext.PSSetConstantBuffers(0, 1, ref adtPerObjectConstantBuffer);
+            deviceContext.VSSetConstantBuffers(1, 1, ref layerDataConstantBuffer);
+            deviceContext.PSSetConstantBuffers(1, 1, ref layerDataConstantBuffer);
+
             foreach (var sceneObject in SceneObjects)
             {
                 if (sceneObject is ADTContainer adt)
                 {
                     if (!RenderADT || !adt.IsLoaded)
                         continue;
-
-                    deviceContext.RSSetState(rasterizerState);
 
                     var vertexBuffer = adt.Terrain.vertexBuffer;
                     var indiceBuffer = adt.Terrain.indiceBuffer;
@@ -1012,18 +1019,8 @@ namespace WoWRenderLib.DX11.Managers
                     };
 
                     deviceContext.UpdateSubresource(adtPerObjectConstantBuffer, 0, ref Unsafe.NullRef<Box>(), ref cb, 0, 0);
-                    deviceContext.VSSetConstantBuffers(0, 1, ref adtPerObjectConstantBuffer);
-                    deviceContext.PSSetConstantBuffers(0, 1, ref adtPerObjectConstantBuffer);
-
-                    deviceContext.IASetInputLayout(adtShaderProgram.InputLayout);
                     deviceContext.IASetVertexBuffers(0, 1, ref vertexBuffer, in adtVertexStride, in adtVertexOffset);
                     deviceContext.IASetIndexBuffer(indiceBuffer, Format.FormatR32Uint, 0);
-
-                    deviceContext.VSSetShader(adtShaderProgram.VertexShader, ref nullClassInstance, 0);
-                    deviceContext.PSSetShader(adtShaderProgram.PixelShader, ref nullClassInstance, 0);
-
-                    deviceContext.VSSetConstantBuffers(1, 1, ref layerDataConstantBuffer);
-                    deviceContext.PSSetConstantBuffers(1, 1, ref layerDataConstantBuffer);
 
                     var layerCB = new LayerData
                     {
