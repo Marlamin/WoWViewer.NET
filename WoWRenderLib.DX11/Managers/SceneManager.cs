@@ -71,6 +71,7 @@ namespace WoWRenderLib.DX11.Managers
         private ComPtr<ID3D11ShaderResourceView> defaultTexture;
         private ComPtr<ID3D11Buffer> bboxConstantBuffer = default;
         private ComPtr<ID3D11Buffer> bboxVertexBuffer = default;
+        private readonly ComPtr<ID3D11BlendState>[] _blendStates = new ComPtr<ID3D11BlendState>[14];
 
         private readonly ComPtr<ID3D11ShaderResourceView>[] _srvScratch = new ComPtr<ID3D11ShaderResourceView>[16];
         private readonly List<int> _visibleIndices = new(64);
@@ -238,6 +239,7 @@ namespace WoWRenderLib.DX11.Managers
                 deviceContext.RSSetState(rastState);
 
                 CreateBBoxBuffers();
+                CreateBlendStates();
             }
         }
 
@@ -248,6 +250,58 @@ namespace WoWRenderLib.DX11.Managers
             public Matrix4x4 view_matrix;
             public Matrix4x4 model_matrix;
             public Vector4 color;
+        }
+
+        private unsafe void CreateBlendStates()
+        {
+            static RenderTargetBlendDesc MakeRTBlend(bool enable, Blend src, Blend dst, Blend srcA, Blend dstA) => new()
+            {
+                BlendEnable = enable ? (Silk.NET.Core.Bool32)1 : (Silk.NET.Core.Bool32)0,
+                SrcBlend = src,
+                DestBlend = dst,
+                BlendOp = BlendOp.Add,
+                SrcBlendAlpha = srcA,
+                DestBlendAlpha = dstA,
+                BlendOpAlpha = BlendOp.Add,
+                RenderTargetWriteMask = (byte)ColorWriteEnable.All
+            };
+
+            (bool enabled, Blend src, Blend dst, Blend srcA, Blend dstA)[] configs =
+            [
+                (false, Blend.One,         Blend.Zero,          Blend.One,         Blend.Zero),
+                (false, Blend.One,         Blend.Zero,          Blend.One,         Blend.Zero),
+                (true,  Blend.SrcAlpha,    Blend.InvSrcAlpha,   Blend.SrcAlpha,    Blend.InvSrcAlpha),
+                (true,  Blend.SrcAlpha,    Blend.One,           Blend.Zero,        Blend.One),
+                (true,  Blend.DestColor,   Blend.Zero,          Blend.DestAlpha,   Blend.Zero),
+                (true,  Blend.DestColor,   Blend.SrcColor,      Blend.DestAlpha,   Blend.SrcAlpha),
+                (true,  Blend.DestColor,   Blend.One,           Blend.DestAlpha,   Blend.One),
+                (true,  Blend.InvSrcAlpha, Blend.One,           Blend.InvSrcAlpha, Blend.One),
+                (true,  Blend.InvSrcAlpha, Blend.Zero,          Blend.InvSrcAlpha, Blend.Zero),
+                (true,  Blend.SrcAlpha,    Blend.Zero,          Blend.SrcAlpha,    Blend.Zero),
+                (true,  Blend.One,         Blend.One,           Blend.Zero,        Blend.One),
+                (true,  Blend.BlendFactor, Blend.InvBlendFactor,Blend.BlendFactor, Blend.InvBlendFactor),
+                (true,  Blend.InvDestColor,Blend.One,           Blend.One,         Blend.Zero),
+                (true,  Blend.One,         Blend.InvSrcAlpha,   Blend.One,         Blend.InvSrcAlpha),
+            ];
+
+            for (int i = 0; i < configs.Length; i++)
+            {
+                var (enabled, src, dst, srcA, dstA) = configs[i];
+                var blendDesc = new BlendDesc { AlphaToCoverageEnable = 0, IndependentBlendEnable = 0 };
+                blendDesc.RenderTarget[0] = MakeRTBlend(enabled, src, dst, srcA, dstA);
+                SilkMarshal.ThrowHResult(device.CreateBlendState(in blendDesc, ref _blendStates[i]));
+            }
+        }
+
+        private unsafe float ApplyBlendMode(int blendType)
+        {
+            if ((uint)blendType >= (uint)_blendStates.Length)
+                blendType = 0;
+
+            float blendFactor = 1f;
+            deviceContext.OMSetBlendState(_blendStates[blendType], ref blendFactor, 0xFFFFFFFF);
+
+            return blendType == 1 ? 0.90393700787f : -1.0f;
         }
 
         private unsafe void CreateBBoxBuffers()
@@ -959,6 +1013,7 @@ namespace WoWRenderLib.DX11.Managers
                     {
                         var batch = m2.submeshes[j];
 
+                        var alphaRef = ApplyBlendMode((int)batch.blendType);
                         var cb = new M2PerObjectCB
                         {
                             projection_matrix = projectionMatrix,
@@ -971,7 +1026,7 @@ namespace WoWRenderLib.DX11.Managers
                             hasTexMatrix1 = 0,
                             hasTexMatrix2 = 0,
                             lightDirection = LightDirection,
-                            alphaRef = 1.0f,
+                            alphaRef = alphaRef,
                             blendMode = batch.blendType,
                             _pad = Vector3.Zero
                         };
@@ -989,6 +1044,8 @@ namespace WoWRenderLib.DX11.Managers
                     }
                 }
             }
+
+            ApplyBlendMode(0);
 
             deviceContext.RSSetState(rasterizerState);
             deviceContext.IASetInputLayout(adtShaderProgram.InputLayout);
@@ -1319,101 +1376,6 @@ namespace WoWRenderLib.DX11.Managers
             return new Vector3(posY, posX, 0);
         }
 
-        //private unsafe uint MakeDefaultTexture()
-        //{
-        //    var defaultTexture = _gl.GenTexture();
-        //    _gl.BindTexture(TextureTarget.Texture2D, defaultTexture);
-        //    byte[] fill = [0, 0, 0, 0];
-        //    fixed (byte* fillPtr = fill)
-        //    {
-        //        _gl.TexImage2D(TextureTarget.Texture2D, 0, InternalFormat.Rgba8, 1, 1, 0, PixelFormat.Rgba, PixelType.UnsignedByte, fillPtr);
-        //    }
-
-        //    _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Linear);
-        //    _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Linear);
-        //    _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)TextureWrapMode.Repeat);
-        //    _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, (int)TextureWrapMode.Repeat);
-
-        //    return defaultTexture;
-        //}
-
-        //private static void SwitchBlendMode(int blendType, GL gl, int alphaRefLoc)
-        //{
-        //    switch (blendType)
-        //    {
-        //        case 0:
-        //            gl.Disable(EnableCap.Blend);
-        //            gl.Uniform1(alphaRefLoc, -1.0f);
-        //            break;
-        //        case 1:
-        //            gl.Disable(EnableCap.Blend);
-        //            gl.Uniform1(alphaRefLoc, 0.90393700787f);
-        //            break;
-        //        case 2:
-        //            gl.Enable(EnableCap.Blend);
-        //            gl.Uniform1(alphaRefLoc, -1.0f);
-        //            gl.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
-        //            break;
-        //        case 3:
-        //            gl.Enable(EnableCap.Blend);
-        //            gl.Uniform1(alphaRefLoc, -1.0f);
-        //            gl.BlendFuncSeparate(BlendingFactor.SrcAlpha, BlendingFactor.One, BlendingFactor.Zero, BlendingFactor.One);
-        //            break;
-        //        case 4:
-        //            gl.Enable(EnableCap.Blend);
-        //            gl.Uniform1(alphaRefLoc, -1.0f);
-        //            gl.BlendFuncSeparate(BlendingFactor.DstColor, BlendingFactor.Zero, BlendingFactor.DstAlpha, BlendingFactor.Zero);
-        //            break;
-        //        case 5:
-        //            gl.Enable(EnableCap.Blend);
-        //            gl.Uniform1(alphaRefLoc, -1.0f);
-        //            gl.BlendFuncSeparate(BlendingFactor.DstColor, BlendingFactor.SrcColor, BlendingFactor.DstAlpha, BlendingFactor.SrcAlpha);
-        //            break;
-        //        case 6:
-        //            gl.Enable(EnableCap.Blend);
-        //            gl.Uniform1(alphaRefLoc, -1.0f);
-        //            gl.BlendFuncSeparate(BlendingFactor.DstColor, BlendingFactor.One, BlendingFactor.DstAlpha, BlendingFactor.One);
-        //            break;
-        //        case 7:
-        //            gl.Enable(EnableCap.Blend);
-        //            gl.Uniform1(alphaRefLoc, -1.0f);
-        //            gl.BlendFuncSeparate(BlendingFactor.OneMinusSrcAlpha, BlendingFactor.One, BlendingFactor.OneMinusSrcAlpha, BlendingFactor.One);
-        //            break;
-        //        case 8:
-        //            gl.Enable(EnableCap.Blend);
-        //            gl.Uniform1(alphaRefLoc, -1.0f);
-        //            gl.BlendFuncSeparate(BlendingFactor.OneMinusSrcAlpha, BlendingFactor.Zero, BlendingFactor.OneMinusSrcAlpha, BlendingFactor.Zero);
-        //            break;
-        //        case 9:
-        //            gl.Enable(EnableCap.Blend);
-        //            gl.Uniform1(alphaRefLoc, -1.0f);
-        //            gl.BlendFuncSeparate(BlendingFactor.SrcAlpha, BlendingFactor.Zero, BlendingFactor.SrcAlpha, BlendingFactor.Zero);
-        //            break;
-        //        case 10:
-        //            gl.Enable(EnableCap.Blend);
-        //            gl.Uniform1(alphaRefLoc, -1.0f);
-        //            gl.BlendFuncSeparate(BlendingFactor.One, BlendingFactor.One, BlendingFactor.Zero, BlendingFactor.One);
-        //            break;
-        //        case 11:
-        //            gl.Enable(EnableCap.Blend);
-        //            gl.Uniform1(alphaRefLoc, -1.0f);
-        //            gl.BlendFuncSeparate(BlendingFactor.ConstantAlpha, BlendingFactor.OneMinusConstantAlpha, BlendingFactor.ConstantAlpha, BlendingFactor.OneMinusConstantAlpha);
-        //            break;
-        //        case 12:
-        //            gl.Enable(EnableCap.Blend);
-        //            gl.Uniform1(alphaRefLoc, -1.0f);
-        //            gl.BlendFuncSeparate(BlendingFactor.OneMinusDstColor, BlendingFactor.One, BlendingFactor.One, BlendingFactor.Zero);
-        //            break;
-        //        case 13:
-        //            gl.Enable(EnableCap.Blend);
-        //            gl.Uniform1(alphaRefLoc, -1.0f);
-        //            gl.BlendFuncSeparate(BlendingFactor.One, BlendingFactor.OneMinusSrcAlpha, BlendingFactor.One, BlendingFactor.OneMinusSrcAlpha);
-        //            break;
-        //        default:
-        //            throw new Exception("Unsupport blend mode: " + blendType);
-        //    }
-        //}
-
         public void Dispose()
         {
             Dispose(true);
@@ -1441,6 +1403,8 @@ namespace WoWRenderLib.DX11.Managers
                 instanceMatrixBuffer.Dispose();
                 defaultTexture.Dispose();
                 bboxDepthStencilState.Dispose();
+                foreach (var bs in _blendStates)
+                    bs.Dispose();
             }
         }
     }
