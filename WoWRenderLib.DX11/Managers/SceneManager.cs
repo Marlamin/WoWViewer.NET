@@ -72,6 +72,7 @@ namespace WoWRenderLib.DX11.Managers
         private ComPtr<ID3D11Buffer> bboxConstantBuffer = default;
         private ComPtr<ID3D11Buffer> bboxVertexBuffer = default;
 
+        private readonly ComPtr<ID3D11ShaderResourceView>[] _srvScratch = new ComPtr<ID3D11ShaderResourceView>[16];
         private uint _renderWidth = 1920;
         private uint _renderHeight = 1080;
 
@@ -884,9 +885,10 @@ namespace WoWRenderLib.DX11.Managers
 
                         deviceContext.UpdateSubresource(wmoPerObjectConstantBuffer, 0, ref Unsafe.NullRef<Box>(), ref cb, 0, 0);
 
-                        var srvs = batch.materialFDIDs.Select(id => id != 0 ? BLPCache.GetCurrent(id, defaultTexture) : defaultTexture).ToArray();
-                        if (srvs.Length > 0)
-                            deviceContext.PSSetShaderResources(0, (uint)srvs.Length, ref srvs[0]);
+                        for (int s = 0; s < batch.materialFDIDs.Length; s++)
+                            _srvScratch[s] = batch.materialFDIDs[s] != 0 ? BLPCache.GetCurrent(batch.materialFDIDs[s], defaultTexture) : defaultTexture;
+                        if (batch.materialFDIDs.Length > 0)
+                            deviceContext.PSSetShaderResources(0, (uint)batch.materialFDIDs.Length, ref _srvScratch[0]);
 
                         deviceContext.DrawIndexedInstanced(batch.numFaces, (uint)batchSize, batch.firstFace, 0, 0);
 
@@ -974,9 +976,10 @@ namespace WoWRenderLib.DX11.Managers
 
                         deviceContext.UpdateSubresource(m2PerObjectConstantBuffer, 0, ref Unsafe.NullRef<Box>(), ref cb, 0, 0);
 
-                        var srvs = batch.material.Select(id => id != 0 ? BLPCache.GetCurrent(id, defaultTexture) : defaultTexture).ToArray();
-                        if (srvs.Length > 0)
-                            deviceContext.PSSetShaderResources(0, (uint)srvs.Length, ref srvs[0]);
+                        for (int s = 0; s < batch.material.Length; s++)
+                            _srvScratch[s] = batch.material[s] != 0 ? BLPCache.GetCurrent(batch.material[s], defaultTexture) : defaultTexture;
+                        if (batch.material.Length > 0)
+                            deviceContext.PSSetShaderResources(0, (uint)batch.material.Length, ref _srvScratch[0]);
 
                         deviceContext.DrawIndexedInstanced(batch.numFaces, (uint)batchCount, batch.firstFace, 0, 0);
                         drawCalls++;
@@ -1053,13 +1056,15 @@ namespace WoWRenderLib.DX11.Managers
                         deviceContext.UpdateSubresource(layerDataConstantBuffer, 0, ref Unsafe.NullRef<Box>(), ref layerCB, 0, 0);
 
 
-                        var materialIDsrvs = batch.materialFDIDs.Select(id => id != 0 ? BLPCache.GetCurrent((uint)id, defaultTexture) : defaultTexture).ToArray();
-                        if (materialIDsrvs.Length > 0)
-                            deviceContext.PSSetShaderResources(0, 8, ref materialIDsrvs[0]);
+                        for (int s = 0; s < 8; s++)
+                            _srvScratch[s] = s < batch.materialFDIDs.Length && batch.materialFDIDs[s] != 0 ? BLPCache.GetCurrent((uint)batch.materialFDIDs[s], defaultTexture) : defaultTexture;
+                        if (batch.materialFDIDs.Length > 0)
+                            deviceContext.PSSetShaderResources(0, 8, ref _srvScratch[0]);
 
-                        var heightMaterialIDsrvs = batch.heightMaterialFDIDs.Select(id => id != 0 ? BLPCache.GetCurrent((uint)id, defaultTexture) : defaultTexture).ToArray();
-                        if (heightMaterialIDsrvs.Length > 0)
-                            deviceContext.PSSetShaderResources(8, 8, ref heightMaterialIDsrvs[0]);
+                        for (int s = 0; s < 8; s++)
+                            _srvScratch[s] = s < batch.heightMaterialFDIDs.Length && batch.heightMaterialFDIDs[s] != 0 ? BLPCache.GetCurrent((uint)batch.heightMaterialFDIDs[s], defaultTexture) : defaultTexture;
+                        if (batch.heightMaterialFDIDs.Length > 0)
+                            deviceContext.PSSetShaderResources(8, 8, ref _srvScratch[0]);
 
                         deviceContext.PSSetShaderResources(16, 2, ref batch.alphaMaterialID[0]);
 
