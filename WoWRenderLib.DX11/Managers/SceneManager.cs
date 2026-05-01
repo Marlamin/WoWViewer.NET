@@ -357,7 +357,7 @@ namespace WoWRenderLib.DX11.Managers
 
             var usedTiles = new List<MapTile>();
 
-            var viewDistance = 2;
+            var viewDistance = 4;
             for (int xOffset = -viewDistance; xOffset <= viewDistance; xOffset++)
             {
                 for (int yOffset = -viewDistance; yOffset <= viewDistance; yOffset++)
@@ -589,7 +589,7 @@ namespace WoWRenderLib.DX11.Managers
             var queueTimer = new Stopwatch();
             queueTimer.Start();
 
-            ADTCache.Upload(queueTimer);
+            ADTCache.Upload(queueTimer, device);
             WMOCache.Upload(queueTimer);
             M2Cache.Upload(queueTimer);
             BLPCache.Upload(queueTimer);
@@ -627,7 +627,7 @@ namespace WoWRenderLib.DX11.Managers
                     var adtContainer = new ADTContainer(device, mapTile);
                     adtContainer.LoadCallback += OnADTContainerLoaded;
 
-                    ADTCache.GetOrLoad(device, mapTile, mapTile.wdtFileDataID, adtContainer.OnLoaded);
+                    ADTCache.GetOrLoad(mapTile, mapTile.wdtFileDataID, adtContainer.OnLoaded);
 
                     lock (SceneObjectLock)
                         SceneObjects.Add(adtContainer);

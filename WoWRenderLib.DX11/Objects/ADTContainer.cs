@@ -2,7 +2,6 @@
 using Silk.NET.Direct3D11;
 using System.Numerics;
 using WoWRenderLib.DX11.Cache;
-using WoWRenderLib.DX11.Loaders;
 using WoWRenderLib.DX11.Structs;
 
 namespace WoWRenderLib.DX11.Objects
@@ -27,14 +26,15 @@ namespace WoWRenderLib.DX11.Objects
 
         public void OnLoaded(Terrain terrain)
         {
+            // this gets called by the cache when it finishes (up)loading terrain
             UpdateTerrain(terrain);
             IsLoaded = true;
-            LoadCallback?.Invoke(this, terrain);
+            LoadCallback?.Invoke(this, terrain); // and in turn we left scene manager know it loaded!
         }
 
         public void Unload()
         {
-            if(IsLoaded)
+            if (IsLoaded)
                 ADTCache.Release(mapTile, mapTile.wdtFileDataID);
 
             IsLoaded = false;

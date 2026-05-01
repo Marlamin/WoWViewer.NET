@@ -18,6 +18,9 @@ namespace WoWRenderLib.DX11.Objects
 
         public ComPtr<ID3D11Device> _device;
 
+        public BoundingBox? CachedBoundingBox { get; set; }
+        public BoundingSphere? CachedBoundingSphere { get; set; }
+
         public bool IsSelected { get; set; } = false;
 
         public Container3D(ComPtr<ID3D11Device> device, uint fileDataId, uint parentFileDataId)

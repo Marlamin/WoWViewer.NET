@@ -9,12 +9,11 @@ namespace WoWRenderLib.DX11.Cache
 {
     public static class ADTCache
     {
-        private static readonly Dictionary<string, Terrain> Cache = [];
-        private static readonly Dictionary<string, List<uint>> Users = [];
-        private static readonly Dictionary<string, Action<Terrain>> Callbacks = [];
+        private static readonly ConcurrentDictionary<string, Terrain> Cache = [];
+        private static readonly ConcurrentDictionary<string, List<uint>> Users = [];
+        private static readonly ConcurrentDictionary<string, Action<Terrain>> Callbacks = [];
 
-        private static ComPtr<ID3D11Device>? cachedDevice = null;
-
+        private static readonly Lock inFlightLock = new();
         private static readonly HashSet<string> inFlight = [];
         private static readonly ConcurrentQueue<(string key, MapTile mapTile)> parseQueue = [];
         private static readonly ConcurrentQueue<(string key, ParsedADT parsedADT)> uploadQueue = [];
@@ -22,20 +21,25 @@ namespace WoWRenderLib.DX11.Cache
         private static CancellationTokenSource? workerCancellation;
         private static Task? workerTask;
 
-        public static Terrain GetOrLoad(ComPtr<ID3D11Device> device, MapTile mapTile, uint parent, Action<Terrain>? onLoaded = null, bool keepTrack = true)
+        public static Terrain GetOrLoad(MapTile mapTile, uint parent, Action<Terrain>? onLoaded = null, bool keepTrack = true)
         {
-            cachedDevice ??= device;
-
             StartWorker();
 
             var key = (mapTile.wdtFileDataID, mapTile.tileX, mapTile.tileY).ToString();
+
 
             if (keepTrack)
             {
                 if (Users.TryGetValue(key, out var users))
                     users.Add(parent);
                 else
-                    Users.Add(key, [parent]);
+                    Users.TryAdd(key, [parent]);
+            }
+
+            lock (inFlightLock)
+            {
+                if (inFlight.Contains(key))
+                    return Cache[key];
             }
 
             if (Cache.TryGetValue(key, out Terrain value))
@@ -48,13 +52,15 @@ namespace WoWRenderLib.DX11.Cache
             }
 
             // TODO: LOD ADT? Better placeholder? Do in ADT container?
-            Cache.Add(key, new Terrain());
+            Cache.TryAdd(key, new Terrain());
 
             // onLoaded here is the callback to the ADT container to fire for when its loaded
             if (onLoaded != null)
                 Callbacks[key] = onLoaded;
 
-            inFlight.Add(key);
+            lock(inFlightLock)
+                inFlight.Add(key);
+            
             parseQueue.Enqueue((key, mapTile));
 
             return Cache[key];
@@ -89,17 +95,17 @@ namespace WoWRenderLib.DX11.Cache
                 catch (Exception e)
                 {
                     Console.WriteLine($"Failed to parse ADT {key}: {e.Message}");
-                    inFlight.Remove(key);
-                    Callbacks.Remove(key);
+                    
+                    lock(inFlightLock)
+                        inFlight.Remove(key);
+                    
+                    Callbacks.TryRemove(key, out _);
                 }
             }
         }
 
-        public static void Upload(Stopwatch queueTimer)
+        public static void Upload(Stopwatch queueTimer, ComPtr<ID3D11Device> device)
         {
-            if (cachedDevice == null)
-                return;
-
             while (queueTimer.ElapsedMilliseconds < 10)
             {
                 if (!uploadQueue.TryDequeue(out var item))
@@ -109,14 +115,16 @@ namespace WoWRenderLib.DX11.Cache
 
                 if (!Cache.TryGetValue(key, out var oldTerrain))
                 {
-                    inFlight.Remove(key);
-                    Callbacks.Remove(key);
+                    lock(inFlightLock)
+                        inFlight.Remove(key);
+                    
+                    Callbacks.TryRemove(key, out _);
                     continue;
                 }
 
                 try
                 {
-                    var newTerrain = ADTLoader.LoadADT(cachedDevice.Value, parsedADT);
+                    var newTerrain = ADTLoader.LoadADT(device, parsedADT);
                     Cache[key] = newTerrain;
 
                     if (Callbacks.Remove(key, out var callback))
@@ -125,10 +133,11 @@ namespace WoWRenderLib.DX11.Cache
                 catch (Exception e)
                 {
                     Console.WriteLine($"Failed to upload ADT {parsedADT.rootADTFileDataID}: {e.Message}");
-                    Callbacks.Remove(key);
+                    Callbacks.TryRemove(key, out _);
                 }
 
-                inFlight.Remove(key);
+                lock(inFlightLock)
+                    inFlight.Remove(key);
             }
         }
 
@@ -150,14 +159,10 @@ namespace WoWRenderLib.DX11.Cache
                 users.Remove(parent);
                 if (users.Count == 0)
                 {
-                    Users.Remove(key);
-                    Callbacks.Remove(key);
-                    if (Cache.Remove(key, out var terrain))
+                    Users.TryRemove(key, out _);
+                    Callbacks.TryRemove(key, out _);
+                    if (Cache.TryRemove(key, out var terrain))
                         ADTLoader.UnloadTerrain(terrain);
-                }
-                else
-                {
-                    Users[key] = users;
                 }
             }
         }
@@ -167,6 +172,8 @@ namespace WoWRenderLib.DX11.Cache
         public static void ReleaseAll()
         {
             Debug.WriteLine("Releasing " + Cache.Count + " cached ADTs.");
+
+            StopWorker();
 
             foreach (var key in Cache.Keys)
                 if (Cache.TryGetValue(key, out var terrain))
