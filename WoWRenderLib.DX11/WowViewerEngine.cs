@@ -249,10 +249,10 @@ namespace WoWRenderLib.DX11
                 BindFlags = (uint)(BindFlag.RenderTarget | BindFlag.ShaderResource),
                 MiscFlags = (uint)(ResourceMiscFlag.Shared  )
             };
-            device.CreateTexture2D(in texDesc, null, ref sharedTexture);
-            device.CreateRenderTargetView(sharedTexture, null, ref _sharedRTV);
+            SilkMarshal.ThrowHResult(device.CreateTexture2D(in texDesc, null, ref sharedTexture));
+            SilkMarshal.ThrowHResult(device.CreateRenderTargetView(sharedTexture, null, ref _sharedRTV));
             ComPtr<ID3D11ShaderResourceView> srv = default;
-            device.CreateShaderResourceView(sharedTexture, null, ref srv);
+            SilkMarshal.ThrowHResult(device.CreateShaderResourceView(sharedTexture, null, ref srv));
             SharedSRV = srv;
 
             sceneManager?.Resize(width, height, _sharedRTV);
