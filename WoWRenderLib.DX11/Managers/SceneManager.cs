@@ -1031,6 +1031,9 @@ namespace WoWRenderLib.DX11.Managers
                             _pad = Vector3.Zero
                         };
 
+                        if (batch.blendType != 0 && batch.blendType != 1)
+                            continue;
+
                         deviceContext.UpdateSubresource(m2PerObjectConstantBuffer, 0, ref Unsafe.NullRef<Box>(), ref cb, 0, 0);
 
                         for (int s = 0; s < batch.material.Length; s++)
