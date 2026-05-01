@@ -182,8 +182,8 @@ namespace WTEditor.Avalonia.Controls
                 _vm.Fps = _engine.Stats.FPS;
                 _vm.FrameTime = _engine.Stats.FrameTimeMs;
                 _vm.CameraPosition = _engine.activeCamera?.Position ?? Vector3.Zero;
-                _vm.DrawCalls = _engine.Stats.DrawCalls;
-                _vm.VertexCount = _engine.Stats.VertexCount;
+                _vm.DrawCalls = (int)_engine.Stats.DrawCalls;
+                _vm.VertexCount = (int)_engine.Stats.VertexCount;
             }
 
             RequestRenderFrame();

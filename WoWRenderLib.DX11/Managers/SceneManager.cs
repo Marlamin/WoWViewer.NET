@@ -752,8 +752,11 @@ namespace WoWRenderLib.DX11.Managers
             SelectedObject?.IsSelected = true;
         }
 
-        public void RenderScene(Camera camera, out bool gizmoWasUsing, out bool gizmoWasOver)
+        public (uint drawCalls, uint vertices) RenderScene(Camera camera, out bool gizmoWasUsing, out bool gizmoWasOver)
         {
+            uint drawCalls = 0;
+            uint verticeCount = 0;
+
             deviceContext.RSSetState(rasterizerState);
 
 #if DEBUG
@@ -886,6 +889,9 @@ namespace WoWRenderLib.DX11.Managers
                             deviceContext.PSSetShaderResources(0, (uint)srvs.Length, ref srvs[0]);
 
                         deviceContext.DrawIndexedInstanced(batch.numFaces, (uint)batchSize, batch.firstFace, 0, 0);
+
+                        drawCalls++;
+                        verticeCount += batch.numFaces;
                     }
                 }
             }
@@ -973,6 +979,8 @@ namespace WoWRenderLib.DX11.Managers
                             deviceContext.PSSetShaderResources(0, (uint)srvs.Length, ref srvs[0]);
 
                         deviceContext.DrawIndexedInstanced(batch.numFaces, (uint)batchCount, batch.firstFace, 0, 0);
+                        drawCalls++;
+                        verticeCount += batch.numFaces;
                     }
                 }
             }
@@ -1056,6 +1064,8 @@ namespace WoWRenderLib.DX11.Managers
                         deviceContext.PSSetShaderResources(16, 2, ref batch.alphaMaterialID[0]);
 
                         deviceContext.DrawIndexed(768, c * 768, 0);
+                        drawCalls++;
+                        verticeCount += 768;
                     }
                 }
             }
@@ -1099,7 +1109,9 @@ namespace WoWRenderLib.DX11.Managers
                                 }
                                 else continue;
 
-                                DrawBoundingBox(localBox, modelMatrix, color, projectionMatrix, cameraMatrix);
+                                (var boxDrawCalls, var boxVerticeCount) = DrawBoundingBox(localBox, modelMatrix, color, projectionMatrix, cameraMatrix);
+                                drawCalls += boxDrawCalls;
+                                verticeCount += boxVerticeCount;
                             }
                         }
 
@@ -1107,7 +1119,11 @@ namespace WoWRenderLib.DX11.Managers
                         {
                             var sphere = sceneObject.GetBoundingSphere();
                             if (sphere.HasValue)
-                                DrawBoundingSphere(sphere.Value, new Vector4(0, 0.5f, 1, 1), projectionMatrix, cameraMatrix);
+                            {
+                                (var sphereDrawCalls, var sphereVerticeCount) = DrawBoundingSphere(sphere.Value, new Vector4(0, 0.5f, 1, 1), projectionMatrix, cameraMatrix);
+                                drawCalls += sphereDrawCalls;
+                                verticeCount += sphereVerticeCount;
+                            }
                         }
                     }
                 }
@@ -1122,10 +1138,15 @@ namespace WoWRenderLib.DX11.Managers
 
             gizmoWasUsing = false;
             gizmoWasOver = false;
+
+            return (drawCalls, verticeCount);
         }
 
-        private unsafe void DrawBoundingSphere(BoundingSphere sphere, Vector4 color, Matrix4x4 projection, Matrix4x4 view)
+        private unsafe (uint drawCalls, uint verticeCount) DrawBoundingSphere(BoundingSphere sphere, Vector4 color, Matrix4x4 projection, Matrix4x4 view)
         {
+            uint drawCalls = 0;
+            uint verticeCount = 0;
+
             const int segments = 32;
             var verts = new List<Vector3>();
 
@@ -1160,7 +1181,7 @@ namespace WoWRenderLib.DX11.Managers
 
             int vertCount = verts.Count; // 3 * segments * 2 = 192 for segments=32
             var sphereVerts = verts.ToArray();
-
+            verticeCount += (uint)vertCount;
             var vbDesc = new BufferDesc
             {
                 ByteWidth = (uint)(vertCount * sizeof(Vector3)),
@@ -1202,11 +1223,17 @@ namespace WoWRenderLib.DX11.Managers
             deviceContext.IASetVertexBuffers(1, 1, ref nullBuffer, in nullStride, in nullOffset);
 
             deviceContext.Draw((uint)vertCount, 0);
+            drawCalls++;
             sphereVB.Dispose();
+                
+            return (drawCalls, verticeCount);
         }
 
-        private unsafe void DrawBoundingBox(BoundingBox localBox, Matrix4x4 modelMatrix, Vector4 color, Matrix4x4 projection, Matrix4x4 view)
+        private unsafe (uint drawCalls, uint verticeCount)  DrawBoundingBox(BoundingBox localBox, Matrix4x4 modelMatrix, Vector4 color, Matrix4x4 projection, Matrix4x4 view)
         {
+            uint drawCalls = 0;
+            uint verticeCount = 0;
+
             var min = localBox.Min;
             var max = localBox.Max;
 
@@ -1256,6 +1283,10 @@ namespace WoWRenderLib.DX11.Managers
             deviceContext.IASetVertexBuffers(1, 1, ref nullBuffer, in nullStride, in nullOffset);
 
             deviceContext.Draw(24, 0);
+            drawCalls++;
+            verticeCount += 24;
+
+            return (drawCalls, verticeCount);
         }
 
         public static (byte x, byte y) GetTileFromPosition(Vector3 position)

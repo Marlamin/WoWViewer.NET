@@ -50,8 +50,8 @@ namespace WoWRenderLib.DX11
         public double FrameTimeMs { get; internal set; }
         public double FPS { get; internal set; }
 
-        public int DrawCalls { get; internal set; }
-        public int VertexCount { get; internal set; }
+        public uint DrawCalls { get; internal set; }
+        public uint VertexCount { get; internal set; }
     }
 
     public class WowViewerEngine : IDisposable
@@ -335,9 +335,12 @@ namespace WoWRenderLib.DX11
 
             if (shadersReady)
             {
-                sceneManager.RenderScene(activeCamera, out bool renderGizmoWasUsing, out bool renderGizmoWasOver);
+                (var drawCalls, var vertices) = sceneManager.RenderScene(activeCamera, out bool renderGizmoWasUsing, out bool renderGizmoWasOver);
                 //if (renderImGUI)
                 //    RenderGizmo();
+
+                Stats.DrawCalls = drawCalls;
+                Stats.VertexCount = vertices;
 
                 gizmoWasUsing = renderGizmoWasUsing;
                 gizmoWasOver = renderGizmoWasOver;
