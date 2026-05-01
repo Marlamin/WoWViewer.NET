@@ -73,6 +73,8 @@ namespace WoWRenderLib.DX11.Managers
         private ComPtr<ID3D11Buffer> bboxVertexBuffer = default;
 
         private readonly ComPtr<ID3D11ShaderResourceView>[] _srvScratch = new ComPtr<ID3D11ShaderResourceView>[16];
+        private readonly List<int> _visibleIndices = new(64);
+
         private uint _renderWidth = 1920;
         private uint _renderHeight = 1080;
 
@@ -822,26 +824,26 @@ namespace WoWRenderLib.DX11.Managers
                 if (!firstInstance.IsLoaded)
                     continue;
 
-                var visibleIndices = new List<int>();
+                _visibleIndices.Clear();
                 for (int i = 0; i < instances.Count; i++)
                 {
                     var sphere = instances[i].GetBoundingSphere();
                     if (sphere.HasValue && frustum.IsSphereVisible(sphere.Value.Center, sphere.Value.Radius))
                     {
                         visibleWMOs++;
-                        visibleIndices.Add(i);
+                        _visibleIndices.Add(i);
                     }
                 }
 
-                if (visibleIndices.Count == 0)
+                if (_visibleIndices.Count == 0)
                     continue;
 
                 var wmo = firstInstance.GetWMO();
                 var enabledGroups = firstInstance.EnabledGroups;
 
-                for (int batchStart = 0; batchStart < visibleIndices.Count; batchStart += MaxInstancesPerBatch)
+                for (int batchStart = 0; batchStart < _visibleIndices.Count; batchStart += MaxInstancesPerBatch)
                 {
-                    int batchSize = Math.Min(MaxInstancesPerBatch, visibleIndices.Count - batchStart);
+                    int batchSize = Math.Min(MaxInstancesPerBatch, _visibleIndices.Count - batchStart);
 
                     // the normal approach to do updatesubresource doesn't work for dynamic buffers, so we have to do the below block instead
                     unsafe
@@ -851,7 +853,7 @@ namespace WoWRenderLib.DX11.Managers
 
                         var dest = new Span<Matrix4x4>(mapped.PData, batchSize);
                         for (int i = 0; i < batchSize; i++)
-                            dest[i] = instances[visibleIndices[batchStart + i]].GetModelMatrix();
+                            dest[i] = instances[_visibleIndices[batchStart + i]].GetModelMatrix();
 
                         deviceContext.Unmap(instanceMatrixBuffer, 0);
                     }
@@ -912,18 +914,18 @@ namespace WoWRenderLib.DX11.Managers
                 if (!RenderM2 || instances.Count == 0)
                     continue;
 
-                var visibleIndices = new List<int>();
+                _visibleIndices.Clear();
                 for (int i = 0; i < instances.Count; i++)
                 {
                     var sphere = instances[i].GetBoundingSphere();
                     if (sphere.HasValue && frustum.IsSphereVisible(sphere.Value.Center, sphere.Value.Radius))
                     {
                         visibleWMOs++;
-                        visibleIndices.Add(i);
+                        _visibleIndices.Add(i);
                     }
                 }
 
-                if (visibleIndices.Count == 0)
+                if (_visibleIndices.Count == 0)
                     continue;
 
                 var m2 = instances[0].GetM2();
@@ -935,9 +937,9 @@ namespace WoWRenderLib.DX11.Managers
                 deviceContext.IASetIndexBuffer(indiceBuffer, Format.FormatR16Uint, 0);
 
                 visibleM2s++;
-                for (int batchStart = 0; batchStart < visibleIndices.Count; batchStart += MaxInstancesPerBatch)
+                for (int batchStart = 0; batchStart < _visibleIndices.Count; batchStart += MaxInstancesPerBatch)
                 {
-                    int batchCount = Math.Min(MaxInstancesPerBatch, visibleIndices.Count - batchStart);
+                    int batchCount = Math.Min(MaxInstancesPerBatch, _visibleIndices.Count - batchStart);
 
                     unsafe
                     {
@@ -946,7 +948,7 @@ namespace WoWRenderLib.DX11.Managers
 
                         var dest = new Span<Matrix4x4>(mapped.PData, batchCount);
                         for (int i = 0; i < batchCount; i++)
-                            dest[i] = instances[visibleIndices[batchStart + i]].GetModelMatrix();
+                            dest[i] = instances[_visibleIndices[batchStart + i]].GetModelMatrix();
 
                         deviceContext.Unmap(instanceMatrixBuffer, 0);
                     }
