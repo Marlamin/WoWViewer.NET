@@ -345,7 +345,7 @@ namespace WoWRenderLib.Loaders
 
                 doodads.Add(new Doodad
                 {
-                    position = new Vector3(-(modelentry.position.X - 17066), modelentry.position.Y, -(modelentry.position.Z - 17066)),
+                    position = new Vector3(-(modelentry.position.X - 17066.666f), modelentry.position.Y, -(modelentry.position.Z - 17066.666f)),
                     rotation = new Vector3(modelentry.rotation.X, modelentry.rotation.Y, modelentry.rotation.Z),
                     scale = modelentry.scale / 1024.0f,
                     fileDataID = modelentry.mmidEntry
