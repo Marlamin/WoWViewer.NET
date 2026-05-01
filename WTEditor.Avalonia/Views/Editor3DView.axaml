@@ -9,7 +9,7 @@
              x:DataType="vm:Editor3DViewModel">
   <Grid Background="Transparent">
     <!-- Render surface -->
-    <controls:GlView/>
+    <controls:Dx11View/>
 
     <!-- Overlay UI -->
     <StackPanel HorizontalAlignment="Left" VerticalAlignment="Top" Margin="10"

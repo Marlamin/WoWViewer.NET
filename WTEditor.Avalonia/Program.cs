@@ -1,6 +1,5 @@
 ﻿using System;
 using Avalonia;
-using Avalonia.OpenGL;
 using Microsoft.Extensions.DependencyInjection;
 using WTEditor.Avalonia.ViewModels;
 using WTEditor.Avalonia.Views;
@@ -38,17 +37,6 @@ namespace WTEditor.Avalonia
                 .WithDeveloperTools()
 #endif
                 .WithInterFont()
-                .With(new Win32PlatformOptions()
-                {
-                    // UseWgl = true,
-                    RenderingMode = [Win32RenderingMode.Wgl],
-                    WglProfiles = new[]
-                    {
-                        new GlVersion(GlProfileType.OpenGL, 4, 5),
-                        new GlVersion(GlProfileType.OpenGL, 4, 0),
-                        new GlVersion(GlProfileType.OpenGL, 3, 3)
-                    }
-                })
                 .LogToTrace();
     }
 }

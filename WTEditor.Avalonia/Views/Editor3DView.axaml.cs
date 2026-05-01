@@ -1,8 +1,8 @@
-using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
-using Avalonia.Interactivity;
-using Avalonia.Markup.Xaml;
+using System;
+using System.Runtime.InteropServices;
+using System.Text;
 using WTEditor.Avalonia.ViewModels;
 
 namespace WTEditor.Avalonia.Views;
@@ -12,6 +12,9 @@ public partial class Editor3DView : UserControl
     // private bool _leftMouseDown = false;
     // private bool _rightMouseDown = false;
     // private Point _lastMousePos;
+
+    [DllImport("user32.dll")]
+    private static extern long GetKeyboardLayoutName(StringBuilder pwszKLID);
 
     private bool _AzertyInput = true; // AZERTY keyboard support
     private Key _MoveForwardKey = Key.W; // rebindable hotkeys for azerty support
@@ -29,6 +32,23 @@ public partial class Editor3DView : UserControl
     public Editor3DView()
     {
         InitializeComponent();
+
+        StringBuilder name = new StringBuilder(9);
+
+        GetKeyboardLayoutName(name);
+        
+        switch(name.ToString())
+        {
+            case "0000040C": // French (France) - AZERTY
+            case "0000080C": // French (Belgium) - AZERTY
+            case "00000C0C": // French (Switzerland) - AZERTY
+            case "0000140C": // French (Luxembourg) - AZERTY
+                _AzertyInput = true;
+                break;
+            default:
+                _AzertyInput = false;
+                break;
+        }
 
         SetKeyboardMode(_AzertyInput);
     }

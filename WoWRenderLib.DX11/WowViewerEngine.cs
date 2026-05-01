@@ -81,6 +81,7 @@ namespace WoWRenderLib.DX11
 
         private ComPtr<ID3D11Texture2D> sharedTexture = default;
         private ComPtr<ID3D11RenderTargetView> _sharedRTV = default;
+        private ComPtr<IDXGIKeyedMutex> _keyedMutex = default;
         public ComPtr<ID3D11ShaderResourceView> SharedSRV { get; private set; }
         public uint SharedTextureWidth => (uint)viewportWidth;
         public uint SharedTextureHeight => (uint)viewportHeight;
@@ -88,7 +89,7 @@ namespace WoWRenderLib.DX11
         public bool IsInitialized = false;
         public bool IsInitializing = false;
 
-        private bool cascLoaded = false;
+        public bool UseKeyedMutex = false;
 
         private CompiledShader adtShaderProgram;
         private CompiledShader wmoShaderProgram;
@@ -232,6 +233,7 @@ namespace WoWRenderLib.DX11
                 activeCamera.AspectRatio = (float)width / (float)height;
 
             // Release old shared resources
+            if (_keyedMutex.Handle != null) { _keyedMutex.Dispose(); _keyedMutex = default; }
             if (_sharedRTV.Handle != null) { _sharedRTV.Dispose(); _sharedRTV = default; }
             var oldSrv = SharedSRV;
             if (oldSrv.Handle != null) { oldSrv.Dispose(); SharedSRV = default; }
@@ -247,15 +249,32 @@ namespace WoWRenderLib.DX11
                 SampleDesc = new SampleDesc(1, 0),
                 Usage = Usage.Default,
                 BindFlags = (uint)(BindFlag.RenderTarget | BindFlag.ShaderResource),
-                MiscFlags = (uint)(ResourceMiscFlag.Shared  )
+                MiscFlags = UseKeyedMutex ? (uint)(ResourceMiscFlag.SharedKeyedmutex) : (uint)(ResourceMiscFlag.Shared)
             };
             SilkMarshal.ThrowHResult(device.CreateTexture2D(in texDesc, null, ref sharedTexture));
             SilkMarshal.ThrowHResult(device.CreateRenderTargetView(sharedTexture, null, ref _sharedRTV));
             ComPtr<ID3D11ShaderResourceView> srv = default;
             SilkMarshal.ThrowHResult(device.CreateShaderResourceView(sharedTexture, null, ref srv));
             SharedSRV = srv;
+            if (UseKeyedMutex)
+            {
+                _keyedMutex = sharedTexture.QueryInterface<IDXGIKeyedMutex>();
+                _keyedMutex.AcquireSync(0, unchecked((uint)-1));
+            }
 
             sceneManager?.Resize(width, height, _sharedRTV);
+        }
+
+        public unsafe void AcquireSharedTextureForDisplay()
+        {
+            if (UseKeyedMutex && _keyedMutex.Handle != null)
+                _keyedMutex.AcquireSync(1, unchecked((uint)-1));
+        }
+
+        public unsafe void ReleaseSharedTextureFromDisplay()
+        {
+            if (UseKeyedMutex && _keyedMutex.Handle != null)
+                _keyedMutex.ReleaseSync(0);
         }
 
         public unsafe IntPtr GetSharedTextureHandle()
@@ -302,10 +321,13 @@ namespace WoWRenderLib.DX11
 
         }
 
-        public void Render(double deltaTime)
+        public unsafe void Render(double deltaTime)
         {
             if(!IsInitialized) return;
             frameDelta = (uint)(deltaTime * 1000);
+
+            if (UseKeyedMutex && _keyedMutex.Handle != null)
+                _keyedMutex.AcquireSync(0, unchecked((uint)-1));
 
             sceneManager.UpdateTilesByCameraPos(activeCamera.Position);
 
@@ -323,6 +345,9 @@ namespace WoWRenderLib.DX11
 
             //if (renderImGUI)
             //    imgui?.Render();
+
+            if (UseKeyedMutex && _keyedMutex.Handle != null)
+                _keyedMutex.ReleaseSync(1);
 
             _frameCount++;
 
@@ -345,6 +370,7 @@ namespace WoWRenderLib.DX11
             if (disposed)
                 return;
 
+            _keyedMutex.Dispose();
             _sharedRTV.Dispose();
             SharedSRV.Dispose();
             sharedTexture.Dispose();
@@ -430,8 +456,6 @@ namespace WoWRenderLib.DX11
                 tactFileProvider.InitTACT(Services.CASC.buildInstance);
                 FileProvider.SetDefaultBuild(TACTSharpFileProvider.BuildName);
                 FileProvider.SetProvider(tactFileProvider, TACTSharpFileProvider.BuildName);
-
-                cascLoaded = true;
 
                 sceneManager.GetCurrentWDT();
                 sceneManager.PreloadTEX();
