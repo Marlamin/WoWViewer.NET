@@ -869,6 +869,18 @@ namespace WoWRenderLib.DX11.Managers
             deviceContext.VSSetConstantBuffers(0, 1, ref wmoPerObjectConstantBuffer);
             deviceContext.PSSetConstantBuffers(0, 1, ref wmoPerObjectConstantBuffer);
 
+            var wmoConstantBuffer = new WMOPerObjectCB
+            {
+                projection_matrix = projectionMatrix,
+                view_matrix = cameraMatrix,
+                model_matrix = Matrix4x4.Identity,
+                vertexShader = 0,
+                pixelShader = 0,
+                _pad0 = Vector2.Zero,
+                lightDirection = LightDirection,
+                alphaRef = 1.0f,
+            };
+
             foreach (var (key, instances) in wmoInstances)
             {
                 if (!RenderWMO || instances.Count == 0)
@@ -927,19 +939,10 @@ namespace WoWRenderLib.DX11.Managers
                         deviceContext.IASetVertexBuffers(0, 1, ref vertexBuffer, in wmoVertexStride, in wmoVertexOffset);
                         deviceContext.IASetIndexBuffer(indiceBuffer, Format.FormatR16Uint, 0);
 
-                        var cb = new WMOPerObjectCB
-                        {
-                            projection_matrix = projectionMatrix,
-                            view_matrix = cameraMatrix,
-                            model_matrix = Matrix4x4.Identity,
-                            vertexShader = (int)ShaderEnums.WMOShaders[(int)batch.shader].VertexShader,
-                            pixelShader = (int)ShaderEnums.WMOShaders[(int)batch.shader].PixelShader,
-                            _pad0 = Vector2.Zero,
-                            lightDirection = LightDirection,
-                            alphaRef = 1.0f,
-                        };
+                        wmoConstantBuffer.vertexShader = (int)ShaderEnums.WMOShaders[(int)batch.shader].VertexShader;
+                        wmoConstantBuffer.pixelShader = (int)ShaderEnums.WMOShaders[(int)batch.shader].PixelShader;
 
-                        deviceContext.UpdateSubresource(wmoPerObjectConstantBuffer, 0, ref Unsafe.NullRef<Box>(), ref cb, 0, 0);
+                        deviceContext.UpdateSubresource(wmoPerObjectConstantBuffer, 0, ref Unsafe.NullRef<Box>(), ref wmoConstantBuffer, 0, 0);
 
                         for (int s = 0; s < batch.materialFDIDs.Length; s++)
                             _srvScratch[s] = batch.materialFDIDs[s] != 0 ? BLPCache.GetCurrent(batch.materialFDIDs[s], defaultTexture) : defaultTexture;
@@ -962,6 +965,23 @@ namespace WoWRenderLib.DX11.Managers
             deviceContext.PSSetSamplers(0, 1, ref textureSampler);
             deviceContext.VSSetConstantBuffers(0, 1, ref m2PerObjectConstantBuffer);
             deviceContext.PSSetConstantBuffers(0, 1, ref m2PerObjectConstantBuffer);
+
+            var m2ConstantBuffer = new M2PerObjectCB
+            {
+                projection_matrix = projectionMatrix,
+                view_matrix = cameraMatrix,
+                model_matrix = Matrix4x4.Identity, // now comes from instance buffer
+                vertexShader = 0,
+                pixelShader = 0,
+                texMatrix1 = Matrix4x4.Identity,
+                texMatrix2 = Matrix4x4.Identity,
+                hasTexMatrix1 = 0,
+                hasTexMatrix2 = 0,
+                lightDirection = LightDirection,
+                alphaRef = 1.0f,
+                blendMode = 0,
+                _pad = Vector3.Zero
+            };
 
             foreach (var (fileDataId, instances) in m2Instances)
             {
@@ -989,7 +1009,7 @@ namespace WoWRenderLib.DX11.Managers
 
                 deviceContext.IASetVertexBuffers(0, 1, ref vertexBuffer, in m2VertexStride, in m2VertexOffset);
                 deviceContext.IASetIndexBuffer(indiceBuffer, Format.FormatR16Uint, 0);
-
+        
                 visibleM2s++;
                 for (int batchStart = 0; batchStart < _visibleIndices.Count; batchStart += MaxInstancesPerBatch)
                 {
@@ -1013,28 +1033,15 @@ namespace WoWRenderLib.DX11.Managers
                     {
                         var batch = m2.submeshes[j];
 
-                        var alphaRef = ApplyBlendMode((int)batch.blendType);
-                        var cb = new M2PerObjectCB
-                        {
-                            projection_matrix = projectionMatrix,
-                            view_matrix = cameraMatrix,
-                            model_matrix = Matrix4x4.Identity, // now comes from instance buffer
-                            vertexShader = (int)batch.vertexShaderID,
-                            pixelShader = (int)batch.pixelShaderID,
-                            texMatrix1 = Matrix4x4.Identity,
-                            texMatrix2 = Matrix4x4.Identity,
-                            hasTexMatrix1 = 0,
-                            hasTexMatrix2 = 0,
-                            lightDirection = LightDirection,
-                            alphaRef = alphaRef,
-                            blendMode = batch.blendType,
-                            _pad = Vector3.Zero
-                        };
-
                         if (batch.blendType != 0 && batch.blendType != 1)
                             continue;
 
-                        deviceContext.UpdateSubresource(m2PerObjectConstantBuffer, 0, ref Unsafe.NullRef<Box>(), ref cb, 0, 0);
+                        m2ConstantBuffer.blendMode = batch.blendType;
+                        m2ConstantBuffer.alphaRef = ApplyBlendMode((int)batch.blendType);
+                        m2ConstantBuffer.vertexShader = (int)batch.vertexShaderID;
+                        m2ConstantBuffer.pixelShader = (int)batch.pixelShaderID;
+
+                        deviceContext.UpdateSubresource(m2PerObjectConstantBuffer, 0, ref Unsafe.NullRef<Box>(), ref m2ConstantBuffer, 0, 0);
 
                         for (int s = 0; s < batch.material.Length; s++)
                             _srvScratch[s] = batch.material[s] != 0 ? BLPCache.GetCurrent(batch.material[s], defaultTexture) : defaultTexture;
@@ -1059,6 +1066,18 @@ namespace WoWRenderLib.DX11.Managers
             deviceContext.VSSetConstantBuffers(1, 1, ref layerDataConstantBuffer);
             deviceContext.PSSetConstantBuffers(1, 1, ref layerDataConstantBuffer);
 
+            var layerCB = new LayerData
+            {
+                layerCount = 0,
+                lightDirection = LightDirection,
+                heightScales0 = Vector4.One,
+                heightScales1 = Vector4.One,
+                heightOffsets0 = Vector4.Zero,
+                heightOffsets1 = Vector4.Zero,
+                layerScales0 = Vector4.One,
+                layerScales1 = Vector4.One,
+            };
+
             foreach (var sceneObject in SceneObjects)
             {
                 if (sceneObject is ADTContainer adt)
@@ -1082,18 +1101,6 @@ namespace WoWRenderLib.DX11.Managers
                     deviceContext.IASetVertexBuffers(0, 1, ref vertexBuffer, in adtVertexStride, in adtVertexOffset);
                     deviceContext.IASetIndexBuffer(indiceBuffer, Format.FormatR32Uint, 0);
 
-                    var layerCB = new LayerData
-                    {
-                        layerCount = 0,
-                        lightDirection = LightDirection,
-                        heightScales0 = Vector4.One,
-                        heightScales1 = Vector4.One,
-                        heightOffsets0 = Vector4.Zero,
-                        heightOffsets1 = Vector4.Zero,
-                        layerScales0 = Vector4.One,
-                        layerScales1 = Vector4.One,
-                    };
-
                     for (uint c = 0; c < 256; c++)
                     {
                         var bounds = adt.Terrain.chunkBounds[c];
@@ -1113,7 +1120,6 @@ namespace WoWRenderLib.DX11.Managers
                         layerCB.layerScales1 = new Vector4(batch.scales[4], batch.scales[5], batch.scales[6], batch.scales[7]);
 
                         deviceContext.UpdateSubresource(layerDataConstantBuffer, 0, ref Unsafe.NullRef<Box>(), ref layerCB, 0, 0);
-
 
                         for (int s = 0; s < 8; s++)
                             _srvScratch[s] = s < batch.materialFDIDs.Length && batch.materialFDIDs[s] != 0 ? BLPCache.GetCurrent((uint)batch.materialFDIDs[s], defaultTexture) : defaultTexture;

@@ -63,7 +63,25 @@ VSOutput VS_Main(VSInput input)
     output.position = mul(projection_matrix, mul(view_matrix, worldPos));
 
     float4x4 modelViewMatrix = mul(view_matrix, model_matrix);
-    float3x3 normalMatrix = transpose((float3x3) modelViewMatrix);
+    float3x3 mv3 = (float3x3) modelViewMatrix;
+
+    float3x3 invMV3;
+    invMV3[0][0] = mv3[1][1] * mv3[2][2] - mv3[1][2] * mv3[2][1];
+    invMV3[0][1] = -(mv3[0][1] * mv3[2][2] - mv3[0][2] * mv3[2][1]);
+    invMV3[0][2] = mv3[0][1] * mv3[1][2] - mv3[0][2] * mv3[1][1];
+    invMV3[1][0] = -(mv3[1][0] * mv3[2][2] - mv3[1][2] * mv3[2][0]);
+    invMV3[1][1] = mv3[0][0] * mv3[2][2] - mv3[0][2] * mv3[2][0];
+    invMV3[1][2] = -(mv3[0][0] * mv3[1][2] - mv3[0][2] * mv3[1][0]);
+    invMV3[2][0] = mv3[1][0] * mv3[2][1] - mv3[1][1] * mv3[2][0];
+    invMV3[2][1] = -(mv3[0][0] * mv3[2][1] - mv3[0][1] * mv3[2][0]);
+    invMV3[2][2] = mv3[0][0] * mv3[1][1] - mv3[0][1] * mv3[1][0];
+
+    float det = mv3[0][0] * invMV3[0][0]
+              + mv3[0][1] * invMV3[1][0]
+              + mv3[0][2] * invMV3[2][0];
+    invMV3 = invMV3 * (1.0f / det);
+
+    float3x3 normalMatrix = transpose(invMV3);
     output.Normal = normalize(mul(normalMatrix, input.normal));
 
     float4x4 textureMatrix1 = hasTexMatrix1 != 0 ? texMatrix1 : float4x4(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1);

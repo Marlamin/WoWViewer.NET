@@ -84,7 +84,7 @@ VSOut VS_Main(VSIn input)
     float4 viewPos = mul(view_matrix, worldPos);
     o.pos = mul(projection_matrix, viewPos);
 
-    float4x4 modelViewMatrix = mul(view_matrix, model_matrix);
+    float4x4 modelViewMatrix = mul(view_matrix, instanceMatrix);
     float3x3 mv3 = (float3x3) modelViewMatrix;
 
     float3x3 invMV3;
