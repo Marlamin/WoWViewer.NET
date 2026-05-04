@@ -1,12 +1,7 @@
 ﻿using Silk.NET.OpenGL;
-using System.Numerics;
-using WoWFormatLib.FileProviders;
-using WoWFormatLib.FileReaders;
-using WoWFormatLib.Structs.M2;
-using WoWFormatLib.Structs.SKIN;
 using WoWRenderLib.OpenGL.Cache;
 using WoWRenderLib.OpenGL.Structs;
-using static WoWRenderLib.OpenGL.Renderer.ShaderEnums;
+using WoWRenderLib.Structs;
 
 namespace WoWRenderLib.OpenGL.Loaders
 {
@@ -14,184 +9,35 @@ namespace WoWRenderLib.OpenGL.Loaders
     {
         private static uint DEFAULT_TEXTURE_ID = 186184; // dungeons/textures/testing/color_01.blp
 
-        public static unsafe DoodadBatch LoadM2(GL gl, uint fileDataID, uint shaderProgram)
+        public static unsafe ParsedDoodadBatch LoadM2(GL gl, ParsedM2 parsedM2, uint shaderProgram)
         {
-            M2Model model = new M2Model();
-
-            if (FileProvider.FileExists(fileDataID))
+            var doodadBatch = new ParsedDoodadBatch()
             {
-                var modelReader = new M2Reader();
-                modelReader.LoadM2(fileDataID);
-                model = modelReader.model;
-            }
-            else
-            {
-                throw new FileNotFoundException("Model " + fileDataID + " does not exist!");
-            }
-
-            Vector3 bbMin, bbMax;
-            float bbRadius;
-
-            if (
-                  model.boundingbox == null ||
-                  model.boundingbox.Length < 2 ||
-                  (model.boundingbox[0] == Vector3.Zero && model.boundingbox[1] == Vector3.Zero) ||
-                  (model.boundingbox[1] == new Vector3(-10000000, -10000000, -10000000) && model.boundingbox[0] == new Vector3(10000000, 10000000, 10000000))
-                  )
-            {
-                var min = new Vector3(float.MaxValue);
-                var max = new Vector3(float.MinValue);
-
-                if (model.vertices != null && model.vertices.Length > 0)
-                {
-                    foreach (var vertex in model.vertices)
-                    {
-                        min = Vector3.Min(min, vertex.position);
-                        max = Vector3.Max(max, vertex.position);
-                    }
-
-                    bbMin = min;
-                    bbMax = max;
-                    bbRadius = Vector3.Distance((bbMin + bbMax) / 2f, bbMax);
-                }
-                else
-                {
-                    // no vertices so this is probably only particle effects?
-                    bbMin = Vector3.Zero;
-                    bbMax = Vector3.Zero;
-                    bbRadius = 0;
-                }
-            }
-            else
-            {
-                bbMin = new Vector3(model.boundingbox[0].X, model.boundingbox[0].Y, model.boundingbox[0].Z);
-                bbMax = new Vector3(model.boundingbox[1].X, model.boundingbox[1].Y, model.boundingbox[1].Z);
-                bbRadius = model.boundingradius;
-            }
-
-            var doodadBatch = new DoodadBatch()
-            {
-                boundingBox = new BoundingBox()
-                {
-                    Min = bbMin,
-                    Max = bbMax
-                },
-                boundingRadius = bbRadius
+                boundingBox = parsedM2.boundingBox,
+                boundingRadius = parsedM2.boundingRadius,
+                fileDataID = parsedM2.fileDataID,
+                mats = parsedM2.mats,
+                submeshes = parsedM2.submeshes
             };
 
-            if (model.textures == null)
-                throw new Exception("Model does not contain textures: " + fileDataID);
-
-            if (model.skins == null)
-                throw new Exception("Model does not contain skins: " + fileDataID);
-
-            // Textures
-            doodadBatch.mats = new M2Material[model.textures.Length];
-            for (var i = 0; i < model.textures.Length; i++)
+            foreach (var mat in doodadBatch.mats)
             {
-                uint textureFileDataID = DEFAULT_TEXTURE_ID;
-                doodadBatch.mats[i].flags = model.textures[i].flags;
-
-                // TODO: Classic Era still has some M2s that use filename-based texturing
-                if (model.textureFileDataIDs != null)
-                {
-                    switch (model.textures[i].type)
-                    {
-                        case 0: // NONE
-                            textureFileDataID = model.textureFileDataIDs[i];
-                            break;
-                        case 1: // TEX_COMPONENT_SKIN
-                        case 2: // TEX_COMPONENT_OBJECT_SKIN
-                        case 11: // TEX_COMPONENT_MONSTER_1
-                            break;
-                    }
-                }
-
-                // Not set in TXID
-                if (textureFileDataID == 0)
-                    textureFileDataID = DEFAULT_TEXTURE_ID;
-
-                doodadBatch.mats[i].fileDataID = textureFileDataID;
-                doodadBatch.mats[i].textureID = BLPCache.GetOrLoad(gl, textureFileDataID, fileDataID);
+                BLPCache.GetOrLoad(gl, mat.fileDataID, parsedM2.fileDataID);
             }
-
-            // Submeshes
-            var submeshes = new List<Structs.Submesh>();
-            for (int i = 0; i < model.skins[0].textureunit.Length; i++)
-            {
-                var batch = model.skins[0].textureunit[i];
-                var skinSection = model.skins[0].submeshes[batch.submeshIndex];
-
-                // TODO: Support
-                if (batch.flags.HasFlag(TextureUnitFlags.ProjectedTexture))
-                    continue;
-
-                var materials = new List<uint>();
-                var firstFace = skinSection.startTriangle;
-                var numFaces = skinSection.nTriangles;
-                var blendType = model.renderflags[batch.renderFlagsIndex].blendingMode;
-                var vertexShaderID = (uint)GetVertexShaderID(batch.textureCount, batch.shaderID);
-                var pixelShaderID = (uint)GetPixelShaderID(batch.textureCount, batch.shaderID);
-
-                for (var tm = 0; tm < batch.textureCount; tm++)
-                {
-                    var textureID = model.texlookup[batch.texture + tm].textureID;
-                    materials.Add(doodadBatch.mats[textureID].textureID);
-                }
-
-                submeshes.Add(new Structs.Submesh()
-                {
-                    firstFace = firstFace,
-                    numFaces = numFaces,
-                    material = [.. materials],
-                    blendType = blendType,
-                    index = i,
-                    vertexShaderID = vertexShaderID,
-                    pixelShaderID = pixelShaderID
-                });
-            }
-
-            doodadBatch.submeshes = [.. submeshes];
 
             doodadBatch.vao = gl.GenVertexArray();
             gl.BindVertexArray(doodadBatch.vao);
 
             doodadBatch.vertexBuffer = gl.GenBuffer();
+            gl.BindBuffer(BufferTargetARB.ArrayBuffer, doodadBatch.vertexBuffer);
+            fixed (byte* buf = parsedM2.vertexBytes)
+                gl.BufferData(BufferTargetARB.ArrayBuffer, (nuint)(parsedM2.vertexBytes.Length), buf, GLEnum.StaticDraw);
+
             doodadBatch.indiceBuffer = gl.GenBuffer();
-
-            gl.BindBuffer(BufferTargetARB.ArrayBuffer, doodadBatch.vertexBuffer);
             gl.BindBuffer(BufferTargetARB.ElementArrayBuffer, doodadBatch.indiceBuffer);
+            fixed (byte* buf = parsedM2.indiceBytes)
+                gl.BufferData(BufferTargetARB.ElementArrayBuffer, (nuint)(parsedM2.indiceBytes.Length), buf, GLEnum.StaticDraw);
 
-            var modelindicelist = new List<uint>();
-            for (var i = 0; i < model.skins[0].triangles.Length; i++)
-            {
-                modelindicelist.Add(model.skins[0].triangles[i].pt1);
-                modelindicelist.Add(model.skins[0].triangles[i].pt2);
-                modelindicelist.Add(model.skins[0].triangles[i].pt3);
-            }
-
-            var modelindices = modelindicelist.ToArray();
-
-            //doodadBatch.indices = modelindices;
-
-            gl.BindBuffer(BufferTargetARB.ElementArrayBuffer, doodadBatch.indiceBuffer);
-            fixed (uint* buf = modelindices)
-                gl.BufferData(BufferTargetARB.ElementArrayBuffer, (nuint)(modelindices.Length * sizeof(uint)), buf, GLEnum.StaticDraw);
-
-            var modelvertices = new M2Vertex[model.vertices.Length];
-
-            for (var i = 0; i < model.vertices.Length; i++)
-            {
-                modelvertices[i].Position = new Vector3(model.vertices[i].position.X, model.vertices[i].position.Y, model.vertices[i].position.Z);
-                modelvertices[i].Normal = new Vector3(model.vertices[i].normal.X, model.vertices[i].normal.Y, model.vertices[i].normal.Z);
-                modelvertices[i].TexCoord1 = new Vector2(model.vertices[i].textureCoordX, model.vertices[i].textureCoordY);
-                modelvertices[i].TexCoord2 = new Vector2(model.vertices[i].textureCoordX2, model.vertices[i].textureCoordY2);
-            }
-            gl.BindBuffer(BufferTargetARB.ArrayBuffer, doodadBatch.vertexBuffer);
-            fixed (M2Vertex* buf = modelvertices)
-                gl.BufferData(BufferTargetARB.ArrayBuffer, (nuint)(modelvertices.Length * 10 * sizeof(float)), buf, GLEnum.StaticDraw);
-
-            //Set pointers in buffer
             var normalAttrib = gl.GetAttribLocation(shaderProgram, "normal");
             gl.EnableVertexAttribArray((uint)normalAttrib);
             gl.VertexAttribPointer((uint)normalAttrib, 3, VertexAttribPointerType.Float, false, sizeof(float) * 10, (void*)(sizeof(float) * 0));
@@ -209,91 +55,6 @@ namespace WoWRenderLib.OpenGL.Loaders
             gl.VertexAttribPointer((uint)posAttrib, 3, VertexAttribPointerType.Float, false, sizeof(float) * 10, (void*)(sizeof(float) * 7));
 
             return doodadBatch;
-        }
-
-        // Based on previously reverse engineerd logic by Deamon: https://github.com/Deamon87/WebWowViewerCpp/blob/master/wowViewerLib/src/engine/objects/m2/m2Object.cpp#L146
-        private static int GetVertexShaderID(int textureCount, ushort shaderID)
-        {
-            int result = 0;
-            if (shaderID >= 0)
-            {
-                if (textureCount == 1)
-                {
-                    if ((shaderID & 0x80u) == 0)
-                        return ((shaderID & 0x4000) != 0 ? 10 : 0);
-                    else
-                        result = 1;
-                }
-                else if ((shaderID & 0x80u) == 0)
-                {
-                    if ((shaderID & 8) != 0)
-                        return 3;
-                    else
-                        result = 7;
-                    if ((shaderID & 0x4000) != 0)
-                        return 2;
-                }
-                else if ((shaderID & 8) != 0)
-                    return 5;
-                else
-                    return 4;
-            }
-            else if (shaderID < 0)
-            {
-                int vertexShaderId = shaderID & 0x7FFF;
-                if (vertexShaderId >= M2Shaders.Count)
-                    throw new Exception("Shader ID " + vertexShaderId + " is out of bounds for M2 shader list (" + M2Shaders.Count + ")");
-
-                result = (int)M2Shaders[vertexShaderId].VertexShader;
-            }
-
-            return result;
-        }
-
-        private static int GetPixelShaderID(int textureCount, ushort shaderID)
-        {
-            int result;
-            if ((shaderID & 0x8000) > 0)
-            {
-                int pixelShaderId = shaderID & 0x7FFF;
-                if (pixelShaderId >= M2Shaders.Count)
-                    throw new Exception("Shader ID " + pixelShaderId + " is out of bounds for M2 shader list (" + M2Shaders.Count + ")");
-
-                result = (int)M2Shaders[shaderID & 0x7FFF].PixelShader;
-            }
-            else if (textureCount == 1)
-            {
-                result = (shaderID & 0x70) != 0 ? (int)M2PixelShader.Combiners_Mod : (int)M2PixelShader.Combiners_Opaque;
-            }
-            else
-            {
-                if ((shaderID & 0x70) != 0)
-                {
-                    result = (shaderID & 7) switch
-                    {
-                        0 => (int)M2PixelShader.Combiners_Mod_Opaque,
-                        1 or 2 or 5 => (int)M2PixelShader.Combiners_Mod_Mod,
-                        3 => (int)M2PixelShader.Combiners_Mod_Add,
-                        4 => (int)M2PixelShader.Combiners_Mod_Mod2x,
-                        6 => (int)M2PixelShader.Combiners_Mod_Mod2xNA,
-                        7 => (int)M2PixelShader.Combiners_Mod_AddNA,
-                        _ => (int)M2PixelShader.Combiners_Mod_Mod,
-                    };
-                }
-                else
-                {
-                    result = (shaderID & 7) switch
-                    {
-                        0 => (int)M2PixelShader.Combiners_Opaque_Opaque,
-                        1 or 2 or 5 => (int)M2PixelShader.Combiners_Opaque_Mod,
-                        3 or 7 => (int)M2PixelShader.Combiners_Opaque_AddAlpha,
-                        4 => (int)M2PixelShader.Combiners_Opaque_Mod2x,
-                        6 => (int)M2PixelShader.Combiners_Opaque_Mod2xNA,
-                        _ => (int)M2PixelShader.Combiners_Opaque_Mod,
-                    };
-                }
-            }
-            return result;
         }
     }
 }

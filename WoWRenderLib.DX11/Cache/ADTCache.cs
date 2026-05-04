@@ -4,6 +4,7 @@ using System.Collections.Concurrent;
 using System.Diagnostics;
 using WoWRenderLib.DX11.Loaders;
 using WoWRenderLib.DX11.Structs;
+using WoWRenderLib.Structs;
 
 namespace WoWRenderLib.DX11.Cache
 {
@@ -89,7 +90,7 @@ namespace WoWRenderLib.DX11.Cache
 
                 try
                 {
-                    var parsed = ADTLoader.ParseADT(mapTile);
+                    var parsed = WoWRenderLib.Loaders.ADTLoader.ParseADT(mapTile);
                     uploadQueue.Enqueue((key, parsed));
                 }
                 catch (Exception e)

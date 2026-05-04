@@ -4,12 +4,13 @@ using System.Collections.Concurrent;
 using System.Diagnostics;
 using WoWRenderLib.DX11.Loaders;
 using WoWRenderLib.DX11.Structs;
+using WoWRenderLib.Structs;
 
 namespace WoWRenderLib.DX11.Cache
 {
     public static class M2Cache
     {
-        private static readonly Dictionary<uint, DoodadBatch> Cache = [];
+        private static readonly Dictionary<uint, ParsedDoodadBatch> Cache = [];
         private static readonly Dictionary<uint, List<uint>> Users = [];
 
         private static ComPtr<ID3D11Device>? cachedDevice = null;
@@ -21,7 +22,7 @@ namespace WoWRenderLib.DX11.Cache
         private static CancellationTokenSource? workerCancellation;
         private static Task? workerTask;
 
-        public static DoodadBatch GetOrLoad(ComPtr<ID3D11Device> device, uint fileDataId, uint parent, bool keepTrack = true)
+        public static ParsedDoodadBatch GetOrLoad(ComPtr<ID3D11Device> device, uint fileDataId, uint parent, bool keepTrack = true)
         {
             cachedDevice ??= device;
 
@@ -35,18 +36,18 @@ namespace WoWRenderLib.DX11.Cache
                     Users.Add(fileDataId, [parent]);
             }
 
-            if (Cache.TryGetValue(fileDataId, out DoodadBatch value))
+            if (Cache.TryGetValue(fileDataId, out ParsedDoodadBatch value))
                 return value;
 
-            DoodadBatch placeholder;
+            ParsedDoodadBatch placeholder;
             try
             {
-                placeholder = M2Loader.LoadM2(device, M2Loader.ParseM2(166046));
+                placeholder = M2Loader.LoadM2(device, WoWRenderLib.Loaders.M2Loader.ParseM2(166046));
             }
             catch (Exception e)
             {
                 Console.WriteLine("!!! Error loading placeholder M2: " + e.Message);
-                placeholder = new DoodadBatch();
+                placeholder = new ParsedDoodadBatch();
             }
 
             Cache.Add(fileDataId, placeholder);
@@ -81,7 +82,7 @@ namespace WoWRenderLib.DX11.Cache
 
                 try
                 {
-                    var parsed = M2Loader.ParseM2(fileDataId);
+                    var parsed = WoWRenderLib.Loaders.M2Loader.ParseM2(fileDataId);
                     uploadQueue.Enqueue((fileDataId, parsed));
                 }
                 catch (Exception e)

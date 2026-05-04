@@ -1,8 +1,8 @@
 ﻿using CASCLib;
 using DBCD.Providers;
-using WoWRenderLib.OpenGL.Services;
+using WoWRenderLib.Services;
 
-namespace WoWRenderLib.OpenGL.Providers
+namespace WoWRenderLib.Providers
 {
     public class DBCProvider : IDBCProvider
     {

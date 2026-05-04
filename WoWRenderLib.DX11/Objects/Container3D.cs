@@ -1,8 +1,8 @@
 ﻿using Silk.NET.Core.Native;
 using Silk.NET.Direct3D11;
 using System.Numerics;
-using WoWRenderLib.DX11.Raycasting;
-using WoWRenderLib.DX11.Structs;
+using WoWRenderLib.Raycasting;
+using WoWRenderLib.Structs;
 
 namespace WoWRenderLib.DX11.Objects
 {

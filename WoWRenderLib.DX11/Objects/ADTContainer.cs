@@ -3,6 +3,7 @@ using Silk.NET.Direct3D11;
 using System.Numerics;
 using WoWRenderLib.DX11.Cache;
 using WoWRenderLib.DX11.Structs;
+using WoWRenderLib.Structs;
 
 namespace WoWRenderLib.DX11.Objects
 {

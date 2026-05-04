@@ -1,8 +1,9 @@
 ﻿using Silk.NET.OpenGL;
 using System.Numerics;
 using WoWRenderLib.OpenGL.Cache;
-using WoWRenderLib.OpenGL.Raycasting;
 using WoWRenderLib.OpenGL.Structs;
+using WoWRenderLib.Raycasting;
+using WoWRenderLib.Structs;
 
 namespace WoWRenderLib.OpenGL.Objects
 {
@@ -10,7 +11,7 @@ namespace WoWRenderLib.OpenGL.Objects
     {
         public bool[] EnabledGeosets { get; }
 
-        private Structs.DoodadBatch m2;
+        private ParsedDoodadBatch m2;
         public WMOContainer? ParentWMO { get; set; } = null;
         public Vector3 LocalPosition { get; set; }
         public Quaternion LocalRotation { get; set; }

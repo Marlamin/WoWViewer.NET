@@ -1,12 +1,23 @@
 ﻿using System.Numerics;
 
-namespace WoWRenderLib.OpenGL.Structs
+namespace WoWRenderLib.Structs
 {
-    public readonly struct MapTile
+    public readonly struct MapTile : IEquatable<MapTile>
     {
         public readonly uint wdtFileDataID { get; init; }
         public readonly byte tileX { get; init; }
         public readonly byte tileY { get; init; }
+
+        public bool Equals(MapTile other)
+        {
+            return tileX == other.tileX && tileY == other.tileY && wdtFileDataID == other.wdtFileDataID;
+        }
+
+        public override bool Equals(object? obj) => obj is MapTile other && Equals(other);
+        public override int GetHashCode() => HashCode.Combine(tileX, tileY, wdtFileDataID);
+
+        public static bool operator ==(MapTile left, MapTile right) => left.Equals(right);
+        public static bool operator !=(MapTile left, MapTile right) => !left.Equals(right);
     }
 
     public struct BoundingBox

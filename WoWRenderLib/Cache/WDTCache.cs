@@ -1,7 +1,7 @@
 ﻿using WoWFormatLib.FileReaders;
 using WoWFormatLib.Structs.WDT;
 
-namespace WoWRenderLib.OpenGL.Cache
+namespace WoWRenderLib.Cache
 {
     public static class WDTCache
     {

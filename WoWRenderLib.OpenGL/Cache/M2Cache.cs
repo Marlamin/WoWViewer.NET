@@ -7,27 +7,29 @@ namespace WoWRenderLib.OpenGL.Cache
 {
     public static class M2Cache
     {
-        private static readonly Dictionary<uint, DoodadBatch> Cache = [];
+        private static readonly Dictionary<uint, ParsedDoodadBatch> Cache = [];
         private static readonly Dictionary<uint, List<uint>> Users = [];
 
-        public static DoodadBatch GetOrLoad(GL gl, uint fileDataId, uint shaderProgram, uint parent)
+        public static ParsedDoodadBatch GetOrLoad(GL gl, uint fileDataId, uint shaderProgram, uint parent)
         {
             if (Users.TryGetValue(fileDataId, out var users))
                 users.Add(parent);
             else
                 Users.Add(fileDataId, [parent]);
 
-            if (Cache.TryGetValue(fileDataId, out DoodadBatch value))
+            if (Cache.TryGetValue(fileDataId, out ParsedDoodadBatch value))
                 return value;
 
             try
             {
-                Cache.Add(fileDataId, M2Loader.LoadM2(gl, fileDataId, shaderProgram));
+                var model = WoWRenderLib.Loaders.M2Loader.ParseM2(fileDataId);
+                Cache.Add(fileDataId, M2Loader.LoadM2(gl, model, shaderProgram));
             }
             catch (Exception e)
             {
+                var model = WoWRenderLib.Loaders.M2Loader.ParseM2(166046);
                 Console.WriteLine("Error loading M2 " + fileDataId + ": " + e.Message);
-                Cache.Add(fileDataId, M2Loader.LoadM2(gl, 166046, shaderProgram));
+                Cache.Add(fileDataId, M2Loader.LoadM2(gl, model, shaderProgram));
             }
 
             return Cache[fileDataId];
@@ -47,7 +49,7 @@ namespace WoWRenderLib.OpenGL.Cache
                         gl.DeleteBuffer(model.vertexBuffer);
                         gl.DeleteBuffer(model.indiceBuffer);
 
-                        foreach(var material in model.mats)
+                        foreach (var material in model.mats)
                         {
                             BLPCache.Release(gl, material.fileDataID, fileDataId);
                         }
@@ -71,11 +73,11 @@ namespace WoWRenderLib.OpenGL.Cache
         {
             Debug.WriteLine("Releasing " + Cache.Count + " cached M2s.");
 
-            foreach(var item in Users)
+            foreach (var item in Users)
             {
                 var fileDataId = item.Key;
                 var parents = new List<uint>(item.Value);
-                foreach(var parent in parents)
+                foreach (var parent in parents)
                     Release(gl, fileDataId, parent);
             }
 

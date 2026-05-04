@@ -9,7 +9,8 @@ using System.Runtime.InteropServices;
 using WoWFormatLib.FileProviders;
 using WoWRenderLib.DX11.Cache;
 using WoWRenderLib.DX11.Managers;
-using WoWRenderLib.DX11.Providers;
+using WoWRenderLib.Managers;
+using WoWRenderLib.Providers;
 
 namespace WoWRenderLib.DX11
 {

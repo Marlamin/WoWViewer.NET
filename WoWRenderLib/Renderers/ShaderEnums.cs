@@ -1,4 +1,4 @@
-﻿namespace WoWRenderLib.DX11.Renderer
+﻿namespace WoWRenderLib.Renderer
 {
     public static class ShaderEnums
     {

@@ -2,6 +2,7 @@
 using System.Diagnostics;
 using WoWRenderLib.OpenGL.Loaders;
 using WoWRenderLib.OpenGL.Structs;
+using WoWRenderLib.Structs;
 
 namespace WoWRenderLib.OpenGL.Cache
 {

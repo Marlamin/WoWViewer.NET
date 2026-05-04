@@ -4,6 +4,7 @@ using System.Collections.Concurrent;
 using System.Diagnostics;
 using WoWRenderLib.DX11.Loaders;
 using WoWRenderLib.DX11.Structs;
+using WoWRenderLib.Structs;
 
 namespace WoWRenderLib.DX11.Cache
 {
@@ -44,7 +45,7 @@ namespace WoWRenderLib.DX11.Cache
 
             try
             {
-                var preppedWMO = WMOLoader.ParseWMO(112521);
+                var preppedWMO = WoWRenderLib.Loaders.WMOLoader.ParseWMO(112521);
                 placeholderWMO = WMOLoader.LoadWMO(preppedWMO, device); // missingwmo.wmo
             }
             catch (Exception e)
@@ -90,7 +91,7 @@ namespace WoWRenderLib.DX11.Cache
 
                 try
                 {
-                    var preppedWMO = WMOLoader.ParseWMO(fileDataId);
+                    var preppedWMO = WoWRenderLib.Loaders.WMOLoader.ParseWMO(fileDataId);
                     uploadQueue.Enqueue((fileDataId, preppedWMO));
                 }
                 catch (Exception e)

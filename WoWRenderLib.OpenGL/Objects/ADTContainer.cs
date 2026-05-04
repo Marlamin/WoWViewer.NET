@@ -1,5 +1,6 @@
 ﻿using Silk.NET.OpenGL;
 using WoWRenderLib.OpenGL.Structs;
+using WoWRenderLib.Structs;
 
 namespace WoWRenderLib.OpenGL.Objects
 {

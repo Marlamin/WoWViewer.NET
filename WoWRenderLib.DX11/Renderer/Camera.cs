@@ -1,5 +1,5 @@
 ﻿using System.Numerics;
-using WoWRenderLib.DX11.Raycasting;
+using WoWRenderLib.Raycasting;
 
 public class Camera
 {

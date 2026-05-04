@@ -1,7 +1,7 @@
 using System.Numerics;
-using WoWRenderLib.OpenGL.Structs;
+using WoWRenderLib.Structs;
 
-namespace WoWRenderLib.OpenGL.Raycasting
+namespace WoWRenderLib.Raycasting
 {
     // additional yoink
     public static class IntersectionTests

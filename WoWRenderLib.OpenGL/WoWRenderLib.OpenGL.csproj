@@ -21,6 +21,7 @@
     <ProjectReference Include="..\BLPSharp\BLPSharp\BLPSharp.csproj" />
     <ProjectReference Include="..\DBCD\DBCD\DBCD.csproj" />
     <ProjectReference Include="..\WoWFormatLib\WoWFormatLib\WoWFormatLib.csproj" />
+    <ProjectReference Include="..\WoWRenderLib\WoWRenderLib.csproj" />
   </ItemGroup>
 
   <ItemGroup>

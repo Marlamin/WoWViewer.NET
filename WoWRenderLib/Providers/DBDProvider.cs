@@ -1,9 +1,9 @@
 ﻿using DBCD.Providers;
 using DBDefsLib;
 using DBDefsLib.Structs;
-using WoWRenderLib.DX11.Managers;
+using WoWRenderLib.Managers;
 
-namespace WoWRenderLib.DX11.Providers
+namespace WoWRenderLib.Providers
 {
     public class DBDProvider : IDBDProvider
     {

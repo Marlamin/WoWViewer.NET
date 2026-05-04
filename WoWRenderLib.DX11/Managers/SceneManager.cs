@@ -6,12 +6,14 @@ using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using WoWFormatLib.Structs.WDT;
+using WoWRenderLib.Cache;
 using WoWRenderLib.DX11.Cache;
 using WoWRenderLib.DX11.Loaders;
 using WoWRenderLib.DX11.Objects;
-using WoWRenderLib.DX11.Raycasting;
-using WoWRenderLib.DX11.Renderer;
 using WoWRenderLib.DX11.Structs;
+using WoWRenderLib.Raycasting;
+using WoWRenderLib.Renderer;
+using WoWRenderLib.Structs;
 
 namespace WoWRenderLib.DX11.Managers
 {
@@ -1009,7 +1011,7 @@ namespace WoWRenderLib.DX11.Managers
 
                 deviceContext.IASetVertexBuffers(0, 1, ref vertexBuffer, in m2VertexStride, in m2VertexOffset);
                 deviceContext.IASetIndexBuffer(indiceBuffer, Format.FormatR16Uint, 0);
-        
+
                 visibleM2s++;
                 for (int batchStart = 0; batchStart < _visibleIndices.Count; batchStart += MaxInstancesPerBatch)
                 {
@@ -1295,11 +1297,11 @@ namespace WoWRenderLib.DX11.Managers
             deviceContext.Draw((uint)vertCount, 0);
             drawCalls++;
             sphereVB.Dispose();
-                
+
             return (drawCalls, verticeCount);
         }
 
-        private unsafe (uint drawCalls, uint verticeCount)  DrawBoundingBox(BoundingBox localBox, Matrix4x4 modelMatrix, Vector4 color, Matrix4x4 projection, Matrix4x4 view)
+        private unsafe (uint drawCalls, uint verticeCount) DrawBoundingBox(BoundingBox localBox, Matrix4x4 modelMatrix, Vector4 color, Matrix4x4 projection, Matrix4x4 view)
         {
             uint drawCalls = 0;
             uint verticeCount = 0;

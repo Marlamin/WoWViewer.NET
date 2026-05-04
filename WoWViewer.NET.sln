@@ -29,6 +29,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WoWRenderLib.DX11", "WoWRen
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WoWViewer.NET.DX11", "WoWViewer.NET.DX11\WoWViewer.NET.DX11.csproj", "{5C46E01A-A6AE-6237-185E-80832A243F00}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WoWRenderLib", "WoWRenderLib\WoWRenderLib.csproj", "{37581702-C44E-4D63-B13D-1200443E9F09}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -86,6 +88,10 @@ Global
 		{5C46E01A-A6AE-6237-185E-80832A243F00}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{5C46E01A-A6AE-6237-185E-80832A243F00}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{5C46E01A-A6AE-6237-185E-80832A243F00}.Release|Any CPU.Build.0 = Release|Any CPU
+		{37581702-C44E-4D63-B13D-1200443E9F09}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{37581702-C44E-4D63-B13D-1200443E9F09}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{37581702-C44E-4D63-B13D-1200443E9F09}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{37581702-C44E-4D63-B13D-1200443E9F09}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

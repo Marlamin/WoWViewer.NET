@@ -1,4 +1,4 @@
-﻿namespace WoWRenderLib.DX11.Managers
+﻿namespace WoWRenderLib.Managers
 {
     public static class SettingsManager
     {

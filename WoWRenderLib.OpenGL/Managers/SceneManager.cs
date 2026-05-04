@@ -2,11 +2,14 @@
 using System.Diagnostics;
 using System.Numerics;
 using WoWFormatLib.Structs.WDT;
+using WoWRenderLib.Cache;
 using WoWRenderLib.OpenGL.Cache;
 using WoWRenderLib.OpenGL.Objects;
-using WoWRenderLib.OpenGL.Raycasting;
 using WoWRenderLib.OpenGL.Renderer;
 using WoWRenderLib.OpenGL.Structs;
+using WoWRenderLib.Raycasting;
+using WoWRenderLib.Renderer;
+using WoWRenderLib.Structs;
 
 namespace WoWRenderLib.OpenGL.Managers
 {

@@ -2,8 +2,9 @@
 using Silk.NET.Direct3D11;
 using System.Numerics;
 using WoWRenderLib.DX11.Cache;
-using WoWRenderLib.DX11.Raycasting;
 using WoWRenderLib.DX11.Structs;
+using WoWRenderLib.Raycasting;
+using WoWRenderLib.Structs;
 
 namespace WoWRenderLib.DX11.Objects
 {
@@ -71,7 +72,7 @@ namespace WoWRenderLib.DX11.Objects
             return m2.boundingBox;
         }
 
-        public DoodadBatch GetM2(bool keepTrack = false)
+        public ParsedDoodadBatch GetM2(bool keepTrack = false)
         {
             return M2Cache.GetOrLoad(_device, FileDataId, ParentFileDataId, keepTrack);
         }

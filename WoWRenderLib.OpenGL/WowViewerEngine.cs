@@ -7,11 +7,12 @@ using System.Diagnostics;
 using System.Numerics;
 using System.Runtime.InteropServices;
 using WoWFormatLib.FileProviders;
+using WoWRenderLib.Managers;
 using WoWRenderLib.OpenGL.Cache;
 using WoWRenderLib.OpenGL.Managers;
 using WoWRenderLib.OpenGL.Objects;
-using WoWRenderLib.OpenGL.Providers;
-using WoWRenderLib.OpenGL.Services;
+using WoWRenderLib.Providers;
+using WoWRenderLib.Services;
 namespace WoWRenderLib.OpenGL
 {
     public struct WowClientConfig
