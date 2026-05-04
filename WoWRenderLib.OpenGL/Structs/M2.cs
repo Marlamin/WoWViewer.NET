@@ -1,6 +1,6 @@
 ﻿using System.Numerics;
 
-namespace WoWRenderLib.Structs
+namespace WoWRenderLib.OpenGL.Structs
 {
     public struct DoodadBatch
     {

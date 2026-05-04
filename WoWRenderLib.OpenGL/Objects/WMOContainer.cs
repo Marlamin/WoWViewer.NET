@@ -1,10 +1,10 @@
 ﻿using Silk.NET.OpenGL;
 using System.Numerics;
-using WoWRenderLib.Cache;
-using WoWRenderLib.Raycasting;
-using WoWRenderLib.Structs;
+using WoWRenderLib.OpenGL.Cache;
+using WoWRenderLib.OpenGL.Raycasting;
+using WoWRenderLib.OpenGL.Structs;
 
-namespace WoWRenderLib.Objects
+namespace WoWRenderLib.OpenGL.Objects
 {
     public class WMOContainer : Container3D
     {

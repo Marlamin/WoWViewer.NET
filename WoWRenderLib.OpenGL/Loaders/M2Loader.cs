@@ -4,11 +4,11 @@ using WoWFormatLib.FileProviders;
 using WoWFormatLib.FileReaders;
 using WoWFormatLib.Structs.M2;
 using WoWFormatLib.Structs.SKIN;
-using WoWRenderLib.Cache;
-using WoWRenderLib.Structs;
-using static WoWRenderLib.Renderer.ShaderEnums;
+using WoWRenderLib.OpenGL.Cache;
+using WoWRenderLib.OpenGL.Structs;
+using static WoWRenderLib.OpenGL.Renderer.ShaderEnums;
 
-namespace WoWRenderLib.Loaders
+namespace WoWRenderLib.OpenGL.Loaders
 {
     class M2Loader
     {

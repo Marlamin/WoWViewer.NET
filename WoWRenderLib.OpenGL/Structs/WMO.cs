@@ -1,7 +1,7 @@
 ﻿using System.Numerics;
-using WoWRenderLib.Renderer;
+using WoWRenderLib.OpenGL.Renderer;
 
-namespace WoWRenderLib.Structs
+namespace WoWRenderLib.OpenGL.Structs
 {
     public struct WMOVertex
     {

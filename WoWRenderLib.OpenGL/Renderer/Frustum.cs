@@ -1,6 +1,6 @@
 using System.Numerics;
 
-namespace WoWRenderLib.Renderer
+namespace WoWRenderLib.OpenGL.Renderer
 {
     public class Frustum
     {

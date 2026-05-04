@@ -1,4 +1,4 @@
-﻿namespace WoWRenderLib.Managers
+﻿namespace WoWRenderLib.OpenGL.Managers
 {
     public static class SettingsManager
     {

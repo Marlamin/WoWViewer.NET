@@ -2,7 +2,7 @@ using Silk.NET.OpenGL;
 using System.Numerics;
 using System.Runtime.InteropServices;
 
-namespace WoWRenderLib.Renderer
+namespace WoWRenderLib.OpenGL.Renderer
 {
     public class DebugRenderer
     {

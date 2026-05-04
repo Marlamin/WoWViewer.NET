@@ -1,6 +1,6 @@
 ﻿using CASCLib;
 
-namespace WoWRenderLib
+namespace WoWRenderLib.OpenGL.Utils
 {
     public static class Listfile
     {

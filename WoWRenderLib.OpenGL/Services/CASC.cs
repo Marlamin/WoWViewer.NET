@@ -1,6 +1,6 @@
 ﻿using TACTSharp;
 
-namespace WoWRenderLib.Services
+namespace WoWRenderLib.OpenGL.Services
 {
     public static class CASC
     {

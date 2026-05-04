@@ -1,6 +1,6 @@
 using System.Numerics;
 
-namespace WoWRenderLib.Raycasting
+namespace WoWRenderLib.OpenGL.Raycasting
 {
     public struct Ray
     {

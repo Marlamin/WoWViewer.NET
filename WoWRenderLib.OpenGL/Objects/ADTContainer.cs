@@ -1,7 +1,7 @@
 ﻿using Silk.NET.OpenGL;
-using WoWRenderLib.Structs;
+using WoWRenderLib.OpenGL.Structs;
 
-namespace WoWRenderLib.Objects
+namespace WoWRenderLib.OpenGL.Objects
 {
     public class ADTContainer : Container3D
     {

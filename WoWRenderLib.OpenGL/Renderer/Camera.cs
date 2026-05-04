@@ -1,5 +1,5 @@
 ﻿using System.Numerics;
-using WoWRenderLib.Raycasting;
+using WoWRenderLib.OpenGL.Raycasting;
 
 public class Camera
 {
@@ -16,7 +16,7 @@ public class Camera
 
     private float Zoom = 45f;
 
-    private readonly WoWRenderLib.Renderer.Frustum _frustum = new();
+    private readonly WoWRenderLib.OpenGL.Renderer.Frustum _frustum = new();
 
     public Camera(Vector3 position, Vector3 front, Vector3 up, float aspectRatio)
     {
@@ -107,7 +107,7 @@ public class Camera
         _frustum.ExtractFromMatrix(viewProjection);
     }
 
-    public WoWRenderLib.Renderer.Frustum GetFrustum()
+    public WoWRenderLib.OpenGL.Renderer.Frustum GetFrustum()
     {
         return _frustum;
     }

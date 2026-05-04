@@ -3,7 +3,7 @@ using Silk.NET.OpenGL;
 using WoWFormatLib.FileProviders;
 using WoWFormatLib.Structs.TEX;
 
-namespace WoWRenderLib.Loaders
+namespace WoWRenderLib.OpenGL.Loaders
 {
     public static class BLPLoader
     {

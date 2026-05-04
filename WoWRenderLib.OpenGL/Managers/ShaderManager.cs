@@ -1,6 +1,6 @@
 ﻿using Silk.NET.OpenGL;
 
-namespace WoWRenderLib.Managers
+namespace WoWRenderLib.OpenGL.Managers
 {
     public class ShaderManager : IDisposable
     {

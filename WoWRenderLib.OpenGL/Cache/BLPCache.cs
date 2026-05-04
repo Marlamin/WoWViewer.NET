@@ -1,10 +1,10 @@
 ﻿using Silk.NET.OpenGL;
 using System.Collections.Concurrent;
 using System.Diagnostics;
-using WoWRenderLib.Loaders;
-using WoWRenderLib.Structs;
+using WoWRenderLib.OpenGL.Loaders;
+using WoWRenderLib.OpenGL.Structs;
 
-namespace WoWRenderLib.Cache
+namespace WoWRenderLib.OpenGL.Cache
 {
     public static class BLPCache
     {

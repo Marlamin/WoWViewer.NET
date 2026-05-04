@@ -2,13 +2,13 @@
 using System.Diagnostics;
 using System.Numerics;
 using WoWFormatLib.Structs.WDT;
-using WoWRenderLib.Cache;
-using WoWRenderLib.Objects;
-using WoWRenderLib.Raycasting;
-using WoWRenderLib.Renderer;
-using WoWRenderLib.Structs;
+using WoWRenderLib.OpenGL.Cache;
+using WoWRenderLib.OpenGL.Objects;
+using WoWRenderLib.OpenGL.Raycasting;
+using WoWRenderLib.OpenGL.Renderer;
+using WoWRenderLib.OpenGL.Structs;
 
-namespace WoWRenderLib.Managers
+namespace WoWRenderLib.OpenGL.Managers
 {
     public class SceneManager(GL gl, ShaderManager shaderManager) : IDisposable
     {

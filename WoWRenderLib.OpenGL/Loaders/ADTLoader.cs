@@ -3,10 +3,10 @@ using System.Numerics;
 using WoWFormatLib.FileProviders;
 using WoWFormatLib.FileReaders;
 using WoWFormatLib.Structs.ADT;
-using WoWRenderLib.Cache;
-using WoWRenderLib.Structs;
+using WoWRenderLib.OpenGL.Cache;
+using WoWRenderLib.OpenGL.Structs;
 
-namespace WoWRenderLib.Loaders
+namespace WoWRenderLib.OpenGL.Loaders
 {
     class ADTLoader
     {

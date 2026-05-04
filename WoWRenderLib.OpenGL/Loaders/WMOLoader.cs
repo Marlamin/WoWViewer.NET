@@ -1,14 +1,13 @@
 ﻿using Silk.NET.OpenGL;
-using Silk.NET.Vulkan;
 using System.Numerics;
 using WoWFormatLib.FileReaders;
 using WoWFormatLib.Structs.WMO;
-using WoWRenderLib.Cache;
-using WoWRenderLib.Renderer;
-using WoWRenderLib.Services;
-using WoWRenderLib.Structs;
+using WoWRenderLib.OpenGL.Cache;
+using WoWRenderLib.OpenGL.Renderer;
+using WoWRenderLib.OpenGL.Services;
+using WoWRenderLib.OpenGL.Structs;
 
-namespace WoWRenderLib.Loaders
+namespace WoWRenderLib.OpenGL.Loaders
 {
     public class WMOLoader
     {

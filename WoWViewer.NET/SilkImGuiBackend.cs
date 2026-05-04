@@ -5,7 +5,7 @@ using Silk.NET.OpenGL;
 using Silk.NET.OpenGL.Extensions.Hexa.ImGui;
 using Silk.NET.Windowing;
 using System.Numerics;
-using WoWRenderLib;
+using WoWRenderLib.OpenGL;
 
 namespace WoWViewer.NET
 {

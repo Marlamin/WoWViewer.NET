@@ -1,7 +1,7 @@
 ﻿using ImGuiNET;
 using System.Numerics;
 
-namespace WoWRenderLib.Utils
+namespace WoWRenderLib.OpenGL.Utils
 {
     public static class ImGuiExtensions
     {

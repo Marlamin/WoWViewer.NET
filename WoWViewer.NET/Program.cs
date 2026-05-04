@@ -1,5 +1,4 @@
-using Silk.NET.Windowing;
-using WoWRenderLib;
+using WoWRenderLib.OpenGL;
 
 namespace WoWViewer.NET
 {

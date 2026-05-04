@@ -1,6 +1,6 @@
 ﻿using Silk.NET.OpenGL;
 
-namespace WoWRenderLib.Structs
+namespace WoWRenderLib.OpenGL.Structs
 {
     public struct DecodedBLP
     {

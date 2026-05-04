@@ -1,4 +1,4 @@
-﻿namespace WoWRenderLib.Renderer
+﻿namespace WoWRenderLib.OpenGL.Renderer
 {
     public static class ShaderEnums
     {

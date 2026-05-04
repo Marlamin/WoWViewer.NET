@@ -3,9 +3,9 @@ using DBCD;
 using DBCD.Providers;
 using Microsoft.Extensions.Caching.Memory;
 using System.Collections.Concurrent;
-using WoWRenderLib.Providers;
+using WoWRenderLib.OpenGL.Providers;
 
-namespace WoWRenderLib.Managers
+namespace WoWRenderLib.OpenGL.Managers
 {
     public class DBCManager(IDBDProvider dbdProvider, IDBCProvider dbcProvider)
     {
