@@ -3,7 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 18
 VisualStudioVersion = 18.4.11626.88
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "WoWRenderLib", "WoWRenderLib\WoWRenderLib.csproj", "{B9B31DDC-4B81-4FA6-A9B5-85DD807DC667}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "WoWRenderLib.OpenGL", "WoWRenderLib.OpenGL\WoWRenderLib.OpenGL.csproj", "{B9B31DDC-4B81-4FA6-A9B5-85DD807DC667}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SceneScriptLib", "SceneScriptLib\SceneScriptLib.csproj", "{EB7D3E95-5C31-487E-B745-24F6FE36920C}"
 EndProject
