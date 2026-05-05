@@ -6,10 +6,11 @@
              xmlns:controls="using:WTEditor.Avalonia.Controls"
              mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
              x:Class="WTEditor.Avalonia.Views.Editor3DView"
-             x:DataType="vm:Editor3DViewModel">
+             x:DataType="vm:Editor3DViewModel"
+             Focusable="True">
   <Grid Background="Transparent">
     <!-- Render surface -->
-    <controls:Dx11View/>
+    <controls:Dx11View Focusable="False"/>
 
     <!-- Overlay UI -->
     <StackPanel HorizontalAlignment="Left" VerticalAlignment="Top" Margin="10"
@@ -29,7 +30,8 @@
         HorizontalAlignment="Right"
         Margin="10"
         IsHitTestVisible="True"
-        Background="Transparent">
+        Background="Transparent"
+        Focusable="False">
       <TextBlock Text="Speed"/>
       <Slider Value="{Binding MoveSpeed}" Minimum="1" Maximum="50" />
       

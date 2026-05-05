@@ -1,8 +1,8 @@
-using Avalonia.Controls;
-using Avalonia.Input;
-using System;
 using System.Runtime.InteropServices;
 using System.Text;
+using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Input;
 using WTEditor.Avalonia.ViewModels;
 
 namespace WTEditor.Avalonia.Views;
@@ -53,6 +53,13 @@ public partial class Editor3DView : UserControl
         SetKeyboardMode(_AzertyInput);
     }
 
+    protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnAttachedToVisualTree(e);
+        // Focusable = true;
+        Focus();
+    }
+
     public void SetKeyboardMode(bool Azerty)
     {
         if (Azerty)
@@ -78,7 +85,7 @@ public partial class Editor3DView : UserControl
     protected override void OnPointerPressed(PointerPressedEventArgs e)
     {
         base.OnPointerPressed(e);
-        Focus();
+
 
         var props = e.GetCurrentPoint(this).Properties;
 
@@ -106,6 +113,8 @@ public partial class Editor3DView : UserControl
         ViewModel.MousePosition = new System.Numerics.Vector2((float)pos.X, (float)pos.Y);
 
         e.Pointer.Capture(this);
+
+        Focus();
     }
 
     protected override void OnPointerReleased(PointerReleasedEventArgs e)
@@ -191,6 +200,11 @@ public partial class Editor3DView : UserControl
         if (e.Key == Key.Space) vm.Space = false;
 
         base.OnKeyUp(e);
+    }
+
+    protected override void OnGotFocus(FocusChangedEventArgs e)
+    {
+        base.OnGotFocus(e);
     }
 
     protected override void OnLostFocus(FocusChangedEventArgs e)
