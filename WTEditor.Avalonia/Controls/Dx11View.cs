@@ -1,5 +1,11 @@
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Linq;
+using System.Numerics;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Input;
 using Avalonia.Platform;
 using Avalonia.Rendering.Composition;
 using Avalonia.Threading;
@@ -7,11 +13,6 @@ using Silk.NET.Core.Native;
 using Silk.NET.Direct3D11;
 using Silk.NET.DXGI;
 using Silk.NET.Maths;
-using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.Linq;
-using System.Numerics;
 using WoWRenderLib.DX11;
 
 namespace WTEditor.Avalonia.Controls
@@ -43,6 +44,11 @@ namespace WTEditor.Avalonia.Controls
 
         private ViewModels.Editor3DViewModel? _vm;
 
+        public Dx11View()
+        {
+            
+        }
+
         protected override void OnDataContextChanged(EventArgs e)
         {
             base.OnDataContextChanged(e);
@@ -52,8 +58,8 @@ namespace WTEditor.Avalonia.Controls
         protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
         {
             base.OnAttachedToVisualTree(e);
-            Focusable = true;
-            Focus();
+            // Focusable = true;
+            // Focus();
             InitializeAsync();
         }
 
