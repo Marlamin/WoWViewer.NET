@@ -69,11 +69,6 @@ namespace WTEditor.Avalonia.Controls
             Cleanup();
         }
 
-        protected override void OnGotFocus(FocusChangedEventArgs e)
-        {
-            base.OnGotFocus(e);
-        }
-
         private async void InitializeAsync()
         {
             var compositionVisual = ElementComposition.GetElementVisual(this);
