@@ -38,21 +38,21 @@ namespace WoWRenderLib.OpenGL.Loaders
             fixed (byte* buf = parsedM2.indiceBytes)
                 gl.BufferData(BufferTargetARB.ElementArrayBuffer, (nuint)(parsedM2.indiceBytes.Length), buf, GLEnum.StaticDraw);
 
+            var posAttrib = gl.GetAttribLocation(shaderProgram, "position");
+            gl.EnableVertexAttribArray((uint)posAttrib);
+            gl.VertexAttribPointer((uint)posAttrib, 3, VertexAttribPointerType.Float, false, sizeof(float) * 10, (void*)(sizeof(float) * 0));
+
             var normalAttrib = gl.GetAttribLocation(shaderProgram, "normal");
             gl.EnableVertexAttribArray((uint)normalAttrib);
-            gl.VertexAttribPointer((uint)normalAttrib, 3, VertexAttribPointerType.Float, false, sizeof(float) * 10, (void*)(sizeof(float) * 0));
+            gl.VertexAttribPointer((uint)normalAttrib, 3, VertexAttribPointerType.Float, false, sizeof(float) * 10, (void*)(sizeof(float) * 3));
 
             var texCoord1Attrib = gl.GetAttribLocation(shaderProgram, "texCoord1");
             gl.EnableVertexAttribArray((uint)texCoord1Attrib);
-            gl.VertexAttribPointer((uint)texCoord1Attrib, 2, VertexAttribPointerType.Float, false, sizeof(float) * 10, (void*)(sizeof(float) * 3));
+            gl.VertexAttribPointer((uint)texCoord1Attrib, 2, VertexAttribPointerType.Float, false, sizeof(float) * 10, (void*)(sizeof(float) * 6));
 
             var texCoord2Attrib = gl.GetAttribLocation(shaderProgram, "texCoord2");
             gl.EnableVertexAttribArray((uint)texCoord2Attrib);
-            gl.VertexAttribPointer((uint)texCoord2Attrib, 2, VertexAttribPointerType.Float, false, sizeof(float) * 10, (void*)(sizeof(float) * 5));
-
-            var posAttrib = gl.GetAttribLocation(shaderProgram, "position");
-            gl.EnableVertexAttribArray((uint)posAttrib);
-            gl.VertexAttribPointer((uint)posAttrib, 3, VertexAttribPointerType.Float, false, sizeof(float) * 10, (void*)(sizeof(float) * 7));
+            gl.VertexAttribPointer((uint)texCoord2Attrib, 2, VertexAttribPointerType.Float, false, sizeof(float) * 10, (void*)(sizeof(float) * 8));
 
             return doodadBatch;
         }

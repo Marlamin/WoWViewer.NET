@@ -285,28 +285,27 @@ namespace WoWRenderLib.OpenGL.Loaders
                     gl.BufferData(BufferTargetARB.ArrayBuffer, (nuint)preppedGroup.vertexBuffer.Length, buf, BufferUsageARB.StaticDraw);
 
                 //Set pointers in buffer
+                var posAttrib = gl.GetAttribLocation(shaderProgram, "position");
+                gl.EnableVertexAttribArray((uint)posAttrib);
+                gl.VertexAttribPointer((uint)posAttrib, 3, VertexAttribPointerType.Float, false, sizeof(float) * 26, (void*)(sizeof(float) * 0));
+
                 var normalAttrib = gl.GetAttribLocation(shaderProgram, "normal");
                 gl.EnableVertexAttribArray((uint)normalAttrib);
-                gl.VertexAttribPointer((uint)normalAttrib, 3, VertexAttribPointerType.Float, false, sizeof(float) * 26, (void*)(sizeof(float) * 0));
-
+                gl.VertexAttribPointer((uint)normalAttrib, 3, VertexAttribPointerType.Float, false, sizeof(float) * 26, (void*)(sizeof(float) * 3));
                 var texCoordAttrib = gl.GetAttribLocation(shaderProgram, "texCoord");
                 gl.EnableVertexAttribArray((uint)texCoordAttrib);
-                gl.VertexAttribPointer((uint)texCoordAttrib, 2, VertexAttribPointerType.Float, false, sizeof(float) * 26, (void*)(sizeof(float) * 3));
+                gl.VertexAttribPointer((uint)texCoordAttrib, 2, VertexAttribPointerType.Float, false, sizeof(float) * 26, (void*)(sizeof(float) * 6));
                 var texCoord2Attrib = gl.GetAttribLocation(shaderProgram, "texCoord2");
                 gl.EnableVertexAttribArray((uint)texCoord2Attrib);
-                gl.VertexAttribPointer((uint)texCoord2Attrib, 2, VertexAttribPointerType.Float, false, sizeof(float) * 26, (void*)(sizeof(float) * 5));
+                gl.VertexAttribPointer((uint)texCoord2Attrib, 2, VertexAttribPointerType.Float, false, sizeof(float) * 26, (void*)(sizeof(float) * 8));
 
                 var texCoord3Attrib = gl.GetAttribLocation(shaderProgram, "texCoord3");
                 gl.EnableVertexAttribArray((uint)texCoord3Attrib);
-                gl.VertexAttribPointer((uint)texCoord3Attrib, 2, VertexAttribPointerType.Float, false, sizeof(float) * 26, (void*)(sizeof(float) * 7));
+                gl.VertexAttribPointer((uint)texCoord3Attrib, 2, VertexAttribPointerType.Float, false, sizeof(float) * 26, (void*)(sizeof(float) * 10));
 
                 var texCoord4Attrib = gl.GetAttribLocation(shaderProgram, "texCoord4");
                 gl.EnableVertexAttribArray((uint)texCoord4Attrib);
-                gl.VertexAttribPointer((uint)texCoord4Attrib, 2, VertexAttribPointerType.Float, false, sizeof(float) * 26, (void*)(sizeof(float) * 9));
-
-                var posAttrib = gl.GetAttribLocation(shaderProgram, "position");
-                gl.EnableVertexAttribArray((uint)posAttrib);
-                gl.VertexAttribPointer((uint)posAttrib, 3, VertexAttribPointerType.Float, false, sizeof(float) * 26, (void*)(sizeof(float) * 11));
+                gl.VertexAttribPointer((uint)texCoord4Attrib, 2, VertexAttribPointerType.Float, false, sizeof(float) * 26, (void*)(sizeof(float) * 12));
 
                 var colorAttrib = gl.GetAttribLocation(shaderProgram, "color1");
                 gl.EnableVertexAttribArray((uint)colorAttrib);

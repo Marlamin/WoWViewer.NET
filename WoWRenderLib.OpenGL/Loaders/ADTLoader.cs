@@ -14,14 +14,13 @@ namespace WoWRenderLib.OpenGL.Loaders
     {
         public static unsafe Terrain LoadADT(GL gl, MapTile mapTile, uint shaderProgram)
         {
-            ADT adt = new();
             Terrain result = new();
             ADTReader adtReader = new();
 
             var wdt = WDTCache.GetOrLoad(mapTile.wdtFileDataID);
 
             var rootADTFileDataID = adtReader.LoadADT(wdt, mapTile.tileX, mapTile.tileY, true, "");
-            adt = adtReader.adtfile;
+            var adt = adtReader.adtfile;
 
             var TileSize = 1600.0f / 3.0f; //533.333
             var ChunkSize = TileSize / 16.0f; //33.333
@@ -125,10 +124,10 @@ namespace WoWRenderLib.OpenGL.Loaders
                     {
                         var v = new ADTVertex
                         {
+                            Position = new Vector3(chunk.header.position.X - (halfHeight * UnitSize), chunk.header.position.Y - (j * UnitSize), chunk.vertices.vertices[idx++] + chunk.header.position.Z),
                             Normal = new Vector3(chunk.normals.normal_0[idx], chunk.normals.normal_1[idx], chunk.normals.normal_2[idx]),
                             Color = chunk.header.flags.HasFlag(MCNKFlags.mcnk_has_mccv) ? new Vector4(chunk.vertexShading.blue[idx] / 255.0f, chunk.vertexShading.green[idx] / 255.0f, chunk.vertexShading.red[idx] / 255.0f, chunk.vertexShading.alpha[idx] / 255.0f) : new Vector4(0.5f, 0.5f, 0.5f, 1.0f),
-                            TexCoord = new Vector2((j + (isInnerVertice ? 0.5f : 0f)) / 8f, (halfHeight) / 8f),
-                            Position = new Vector3(chunk.header.position.X - (halfHeight * UnitSize), chunk.header.position.Y - (j * UnitSize), chunk.vertices.vertices[idx++] + chunk.header.position.Z)
+                            TexCoord = new Vector2((j + (isInnerVertice ? 0.5f : 0f)) / 8f, (halfHeight) / 8f)
                         };
 
                         if (isInnerVertice)
@@ -322,17 +321,17 @@ namespace WoWRenderLib.OpenGL.Loaders
             fixed (ADTVertex* buf = vertices)
                 gl.BufferData(BufferTargetARB.ArrayBuffer, (nuint)vertices.Length * 12 * sizeof(float), buf, GLEnum.StaticDraw);
 
-            gl.EnableVertexAttribArray((uint)normalAttrib);
-            gl.VertexAttribPointer((uint)normalAttrib, 3, GLEnum.Float, false, sizeof(float) * 12, (void*)(sizeof(float) * 0));
+            gl.EnableVertexAttribArray((uint)posAttrib);
+            gl.VertexAttribPointer((uint)posAttrib, 3, GLEnum.Float, false, sizeof(float) * 12, (void*)(sizeof(float) * 0));
 
-            gl.EnableVertexAttribArray((uint)colorAttrib);
-            gl.VertexAttribPointer((uint)colorAttrib, 4, GLEnum.Float, false, sizeof(float) * 12, (void*)(sizeof(float) * 3));
+            gl.EnableVertexAttribArray((uint)normalAttrib);
+            gl.VertexAttribPointer((uint)normalAttrib, 3, GLEnum.Float, false, sizeof(float) * 12, (void*)(sizeof(float) * 3));
 
             gl.EnableVertexAttribArray((uint)texCoordAttrib);
-            gl.VertexAttribPointer((uint)texCoordAttrib, 2, GLEnum.Float, false, sizeof(float) * 12, (void*)(sizeof(float) * 7));
+            gl.VertexAttribPointer((uint)texCoordAttrib, 2, GLEnum.Float, false, sizeof(float) * 12, (void*)(sizeof(float) * 6));
 
-            gl.EnableVertexAttribArray((uint)posAttrib);
-            gl.VertexAttribPointer((uint)posAttrib, 3, GLEnum.Float, false, sizeof(float) * 12, (void*)(sizeof(float) * 9));
+            gl.EnableVertexAttribArray((uint)colorAttrib);
+            gl.VertexAttribPointer((uint)colorAttrib, 4, GLEnum.Float, false, sizeof(float) * 12, (void*)(sizeof(float) * 8));
 
             gl.BindBuffer(BufferTargetARB.ElementArrayBuffer, result.indiceBuffer);
             fixed (int* buf = indices)
