@@ -100,15 +100,6 @@ public partial class Editor3DView : UserControl
                 break;
         }
 
-        // if (e.GetCurrentPoint(this).Properties.IsRightButtonPressed)
-        // {
-        //     _rightMouseDown = true;
-        // }
-        // if (e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
-        // {
-        //     _leftMouseDown = true;
-        // }
-
         var pos = e.GetPosition(this);
         ViewModel.MousePosition = new System.Numerics.Vector2((float)pos.X, (float)pos.Y);
 
@@ -121,17 +112,6 @@ public partial class Editor3DView : UserControl
     {
 
         var props = e.GetCurrentPoint(this).Properties;
-
-        // if (!e.GetCurrentPoint(this).Properties.IsRightButtonPressed)
-        // {
-        //     _rightMouseDown = false;
-        // }
-        // if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
-        // {
-        //     _leftMouseDown = false;
-        // }
-        // e.Pointer.Capture(null);
-
         switch (props.PointerUpdateKind)
         {
             case PointerUpdateKind.LeftButtonReleased:
@@ -189,15 +169,15 @@ public partial class Editor3DView : UserControl
         var vm = ViewModel;
         if (vm == null) return;
 
-        if (e.Key == _MoveForwardKey) vm.Forward = false;
-        if (e.Key == _MoveBackwardKey) vm.Backward = false;
-        if (e.Key == _MoveLeftKey) vm.Left = false;
-        if (e.Key == _MoveRightKey) vm.Right = false;
-        if (e.Key == _MoveDownKey) vm.Down = false;
-        if (e.Key == _MoveUpKey) vm.Up = false;
-        if (e.Key == Key.LeftShift || e.Key == Key.RightShift) vm.Shift = false;
-        if (e.Key == Key.LeftCtrl || e.Key == Key.RightCtrl) vm.Ctrl = false;
-        if (e.Key == Key.Space) vm.Space = false;
+        vm.Forward = false;
+        vm.Backward = false;
+        vm.Left = false;
+        vm.Right = false;
+        vm.Down = false;
+        vm.Up = false;
+        vm.Shift = false;
+        vm.Ctrl = false;
+        vm.Space = false;
 
         base.OnKeyUp(e);
     }
@@ -209,7 +189,23 @@ public partial class Editor3DView : UserControl
 
     protected override void OnLostFocus(FocusChangedEventArgs e)
     {
-
         base.OnLostFocus(e);
+
+        var vm = ViewModel;
+        if (vm == null) return;
+
+        // reset inputs
+        vm.Forward = false;
+        vm.Backward = false;
+        vm.Left = false;
+        vm.Right = false;
+        vm.Down = false;
+        vm.Up = false;
+        vm.Shift = false;
+        vm.Ctrl = false;
+        vm.Space = false;
+
+        vm.LeftMouseDown = false;
+        vm.RightMouseDown = false;
     }
 }
