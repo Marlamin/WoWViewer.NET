@@ -169,15 +169,15 @@ public partial class Editor3DView : UserControl
         var vm = ViewModel;
         if (vm == null) return;
 
-        vm.Forward = false;
-        vm.Backward = false;
-        vm.Left = false;
-        vm.Right = false;
-        vm.Down = false;
-        vm.Up = false;
-        vm.Shift = false;
-        vm.Ctrl = false;
-        vm.Space = false;
+        if (e.Key == _MoveForwardKey) vm.Forward = false;
+        if (e.Key == _MoveBackwardKey) vm.Backward = false;
+        if (e.Key == _MoveLeftKey) vm.Left = false;
+        if (e.Key == _MoveRightKey) vm.Right = false;
+        if (e.Key == _MoveDownKey) vm.Down = false;
+        if (e.Key == _MoveUpKey) vm.Up = false;
+        if (e.Key == Key.LeftShift || e.Key == Key.RightShift) vm.Shift = false;
+        if (e.Key == Key.LeftCtrl || e.Key == Key.RightCtrl) vm.Ctrl = false;
+        if (e.Key == Key.Space) vm.Space = false;
 
         base.OnKeyUp(e);
     }
