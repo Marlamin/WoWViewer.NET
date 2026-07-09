@@ -752,6 +752,12 @@ namespace WoWRenderLib.DX11.Managers
             loadedTiles.Add(adtContainer.mapTile);
         }
 
+        public void MoveSelectedObject(Vector3 delta)
+        {
+            SelectedObject?.Position += delta;
+            SelectedObject?.ModelMatrix = null;
+        }
+
         public void PerformRaycast(float mouseX, float mouseY, Camera camera, int windowWidth, int windowHeight)
         {
             var ray = camera.GetRayFromScreen(mouseX, mouseY, windowWidth, windowHeight);

@@ -154,6 +154,10 @@ namespace WoWRenderLib.DX11
                         if (installPath != null)
                             _wowConfig.wowDir = installPath;
                     }
+                    else
+                    {
+                        _wowConfig.wowDir = "C:\\World of Warcraft";
+                    }
                 }
             }
 
@@ -167,7 +171,7 @@ namespace WoWRenderLib.DX11
         public void Initialize(DXGI dxgi, ComPtr<ID3D11Device> device, ComPtr<ID3D11DeviceContext> deviceContext, Vector2D<int> frameBufferSize)
         {
             Console.WriteLine("Initializing WowViewerEngine..."); ;
-            if(IsInitializing) return;
+            if (IsInitializing) return;
 
             IsInitializing = true;
 
@@ -324,7 +328,7 @@ namespace WoWRenderLib.DX11
 
         public unsafe void Render(double deltaTime)
         {
-            if(!IsInitialized) return;
+            if (!IsInitialized) return;
             frameDelta = (uint)(deltaTime * 1000);
 
             if (UseKeyedMutex && _keyedMutex.Handle != null)
@@ -415,7 +419,7 @@ namespace WoWRenderLib.DX11
             }
 
             _products = _productList.Keys.ToArray();
-
+            _wowConfig.wowProduct = "wow";
             // optional, set first product as current if none is current yet
             // only if there's exactly one product for now to avoid not being able to switch
             if (_SetDefaultProduct && string.IsNullOrEmpty(_wowConfig.wowProduct) && _products.Length > 0)
@@ -577,6 +581,9 @@ namespace WoWRenderLib.DX11
             if (input.KeysDown.Contains(Key.ShiftLeft) && input.KeysDown.Contains(Key.ControlLeft))
                 moveSpeed *= 4.0f;
 
+            if (input.KeysDown.Contains(Key.AltLeft))
+                moveSpeed *= 0.04f;
+
             var moveFront = Vector3.Normalize(new Vector3(activeCamera.Front.X, 0f, activeCamera.Front.Z));
             if (input.KeysDown.Contains(Key.W))
                 activeCamera.Position += moveSpeed * activeCamera.Front;
@@ -614,6 +621,23 @@ namespace WoWRenderLib.DX11
             {
                 // TODO: Gizmo
             }
+
+            if(input.KeysDown.Contains(Key.Up))
+                sceneManager.MoveSelectedObject(Vector3.UnitZ * moveSpeed);
+            else if(input.KeysDown.Contains(Key.Down))
+                sceneManager.MoveSelectedObject(-Vector3.UnitZ * moveSpeed);
+            else if (input.KeysDown.Contains(Key.Left))
+                sceneManager.MoveSelectedObject(-Vector3.UnitX * moveSpeed);
+            else if (input.KeysDown.Contains(Key.Right))
+                sceneManager.MoveSelectedObject(Vector3.UnitX * moveSpeed);
+            else if(input.KeysDown.Contains(Key.Z))
+                sceneManager.MoveSelectedObject(Vector3.UnitY * moveSpeed);
+            else if (input.KeysDown.Contains(Key.X))
+                sceneManager.MoveSelectedObject(-Vector3.UnitY * moveSpeed);
+
+            if (input.KeysDown.Contains(Key.ControlLeft) && input.KeysDown.Contains(Key.F))
+                sceneManager.SaveManualJSON();
+
             wasSpacePressed = spacePressed;
         }
         #endregion
