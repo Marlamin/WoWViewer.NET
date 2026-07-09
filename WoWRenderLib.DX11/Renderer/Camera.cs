@@ -67,7 +67,7 @@ public class Camera
 
     public Matrix4x4 GetProjectionMatrix()
     {
-        return Matrix4x4.CreatePerspectiveFieldOfViewLeftHanded(DegreesToRadians(Zoom), AspectRatio, 10.0f, 20000);
+        return Matrix4x4.CreatePerspectiveFieldOfViewLeftHanded(DegreesToRadians(Zoom), AspectRatio, 1.0f, 20000);
     }
 
     public Ray GetRayFromScreen(float screenX, float screenY, int screenWidth, int screenHeight)
