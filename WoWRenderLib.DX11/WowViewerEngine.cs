@@ -635,8 +635,8 @@ namespace WoWRenderLib.DX11
             else if (input.KeysDown.Contains(Key.X))
                 sceneManager.MoveSelectedObject(-Vector3.UnitY * moveSpeed);
 
-            if (input.KeysDown.Contains(Key.ControlLeft) && input.KeysDown.Contains(Key.F))
-                sceneManager.SaveManualJSON();
+            //if (input.KeysDown.Contains(Key.ControlLeft) && input.KeysDown.Contains(Key.F))
+            //    sceneManager.SaveManualJSON();
 
             wasSpacePressed = spacePressed;
         }
