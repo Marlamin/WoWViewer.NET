@@ -841,6 +841,9 @@ namespace WoWRenderLib.DX11.Managers
 
             var backgroundColour = new[] { 0f, 0f, 0f, 1.0f };
 
+            ComPtr<ID3D11ShaderResourceView> nullSRV = default;
+            deviceContext.PSSetShaderResources(0, 1, ref nullSRV);
+
             deviceContext.ClearRenderTargetView(renderTargetView, ref backgroundColour[0]);
             deviceContext.OMSetRenderTargets(1, ref renderTargetView, depthStencilView);
             deviceContext.ClearDepthStencilView(depthStencilView, (uint)ClearFlag.Depth, 1.0f, 0);
