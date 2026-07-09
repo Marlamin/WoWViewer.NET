@@ -839,7 +839,7 @@ namespace WoWRenderLib.DX11.Managers
             visibleWMOs = 0;
             visibleChunks = 0;
 
-            var backgroundColour = new[] { 1.0f, 0.0f, 0.0f, 1.0f };
+            var backgroundColour = new[] { 0f, 0f, 0f, 1.0f };
 
             deviceContext.ClearRenderTargetView(renderTargetView, ref backgroundColour[0]);
             deviceContext.OMSetRenderTargets(1, ref renderTargetView, depthStencilView);
